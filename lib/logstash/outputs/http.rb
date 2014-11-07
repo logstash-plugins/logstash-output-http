@@ -25,7 +25,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   config :http_method, :validate => ["put", "post"], :required => :true
 
   # Custom headers to use
-  # format is `headers => ["X-My-Header", "%{host}"]
+  # format is `headers => ["X-My-Header", "%{host}"]`
   config :headers, :validate => :hash
 
   # Content type
@@ -40,14 +40,14 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   #
   #
   # For example:
-  #
+  # [source,ruby]
   #    mapping => ["foo", "%{host}", "bar", "%{type}"]
   config :mapping, :validate => :hash
 
   # Set the format of the http body.
   #
   # If form, then the body will be the mapping (or whole event) converted
-  # into a query parameter string (foo=bar&baz=fizz...)
+  # into a query parameter string, e.g. `foo=bar&baz=fizz...`
   #
   # If message, then the body will be the result of formatting the event according to message
   #
