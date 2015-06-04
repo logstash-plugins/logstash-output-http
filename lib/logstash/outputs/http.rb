@@ -3,29 +3,41 @@ require "logstash/outputs/base"
 require "logstash/namespace"
 require "logstash/json"
 
+# This output lets you `PUT` or `POST` events to a
+# generic HTTP(S) endpoint
+#
+# Additionally, you are given the option to customize
+# the headers sent as well as basic customization of the
+# event json itself.
 class LogStash::Outputs::Http < LogStash::Outputs::Base
-  # This output lets you `PUT` or `POST` events to a
-  # generic HTTP(S) endpoint
-  #
-  # Additionally, you are given the option to customize
-  # the headers sent as well as basic customization of the
-  # event json itself.
 
   config_name "http"
 
   # URL to use
   config :url, :validate => :string, :required => :true
 
-  # validate SSL?
+  # If TLS/SSL is used (because the `url` is "https://...", then this
+  # setting will determine if certificate validation is done.
+  #
+  # Note: If you set this to false, you will be destroying the security
+  # features provided by TLS. Setting this to false is never recommended,
+  # especially never in production.
   config :verify_ssl, :validate => :boolean, :default => true
 
-  # What verb to use
-  # only put and post are supported for now
+  # If TLS/SSL is used (because `url` is "https://..."), then this setting
+  # will determine which version of the SSL/TLS protocol is used.
+  #
+  # TLSv1.1 is recommended. SSLv3 is heavily discouraged and should not be used
+  # but is available for legacy systems.
+  config :ssl_version, :validate => [ "TLSv1", "TLSv1.1", "SSLv3" ], :default => "TLSv1.1"
+
+  # What http request method to use. Only put and post are supported for now.
   config :http_method, :validate => ["put", "post"], :required => :true
 
   # Custom headers to use
   # format is `headers => ["X-My-Header", "%{host}"]`
   config :headers, :validate => :hash
+
 
   # Content type
   #
@@ -79,6 +91,18 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         @logger.warn "mapping is not supported and will be ignored if message format is used"
       end
     end
+
+    if !@verify_ssl
+      # User requests that SSL certificates are not validated, so let's
+      # override the certificate verification
+      class << @agent
+        def certificate_verify(host, port, verified, context)
+          return true
+        end
+      end
+    end
+
+    @agent.configuration[FTW::Agent::SSL_VERSION] = @ssl_version
   end # def register
 
   public
