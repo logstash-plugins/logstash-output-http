@@ -60,7 +60,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     require "ftw"
     require "uri"
     @agent = FTW::Agent.new
-    # TODO(sissel): SSL verify mode?
+    if not @verify_ssl
+      @logger.info "Disabling ssl certificate validation."
+      @agent.configuration[FTW::Agent::SSL_VERIFY] = false
+    end
 
     if @content_type.nil?
       case @format
