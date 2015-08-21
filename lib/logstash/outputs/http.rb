@@ -53,14 +53,25 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # Otherwise, the event is sent as json.
   config :format, :validate => ["json", "form", "message"], :default => "json"
 
+  # Number of concurrent requests
+  config :concurrent_requests, :validate => :number, :default => 10
+
   config :message, :validate => :string
 
   public
   def register
-    require "ftw"
+    require "manticore"
     require "uri"
-    @agent = FTW::Agent.new
-    # TODO(sissel): SSL verify mode?
+
+    ssl = Hash.new
+    if @verify_ssl
+      ssl["verify"] = :strict
+    else
+      ssl["verify"] = :disable
+    end
+
+    @client = Manticore::Client.new pool_max: @concurrent_requests, ssl: ssl
+    @requests = Array.new
 
     if @content_type.nil?
       case @format
@@ -94,43 +105,49 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       evt = event.to_hash
     end
 
-    case @http_method
-    when "put"
-      request = @agent.put(event.sprintf(@url))
-    when "post"
-      request = @agent.post(event.sprintf(@url))
-    else
-      @logger.error("Unknown verb:", :verb => @http_method)
-    end
-
+    request_headers = Hash.new
     if @headers
       @headers.each do |k,v|
-        request.headers[k] = event.sprintf(v)
+        request_headers = event.sprintf(v)
       end
     end
 
-    request["Content-Type"] = @content_type
+    request_headers["Content-Type"] = @content_type
 
     begin
       if @format == "json"
-        request.body = LogStash::Json.dump(evt)
+        body = LogStash::Json.dump(evt)
       elsif @format == "message"
-        request.body = event.sprintf(@message)
+        body = event.sprintf(@message)
       else
-        request.body = encode(evt)
+        body = encode(evt)
       end
-      #puts "#{request.port} / #{request.protocol}"
-      #puts request
-      #puts
-      #puts request.body
-      response = @agent.execute(request)
 
-      # Consume body to let this connection be reused
-      rbody = ""
-      response.read_body { |c| rbody << c }
-      #puts rbody
+      if @requests.size >= @concurrent_requests
+        future = @requests.shift
+        begin
+          response = ""
+          response = future.get
+          rbody = ""
+          response.read_body { |c| rbody << c }
+          # puts rbody
+        rescue Exception => e
+          @logger.warn("Unhandled exception", :response => response, :exception => e, :stacktrace => e.backtrace)
+        end
+      end
+
+      case @http_method
+      when "post"
+        response_future = @client.background.post(event.sprintf(@url), body: body, headers: request_headers)
+      when "put"
+        response_future = @client.background.put(event.sprintf(@url), body: body, headers: request_headers)
+      else
+        @logger.error("Unknown verb:", :verb => @http_method)
+      end
+
+      @requests.push(response_future)
     rescue Exception => e
-      @logger.warn("Unhandled exception", :request => request, :response => response, :exception => e, :stacktrace => e.backtrace)
+      @logger.warn("Unhandled exception", :error => e)
     end
   end # def receive
 
