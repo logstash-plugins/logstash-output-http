@@ -71,6 +71,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     end
 
     @client = Manticore::Client.new pool_max: @concurrent_requests, ssl: ssl
+    @requests = Array.new
 
     if @content_type.nil?
       case @format
@@ -122,14 +123,31 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         body = encode(evt)
       end
 
-      response = @client.http(@http_method, event.sprintf(@url), body: body, headers: request_headers)
+      if @requests.size >= @concurrent_requests
+        future = @requests.shift
+        begin
+          response = ""
+          response = future.get
+          rbody = ""
+          response.read_body { |c| rbody << c }
+          # puts rbody
+        rescue Exception => e
+          @logger.warn("Unhandled exception", :response => response, :exception => e, :stacktrace => e.backtrace)
+        end
+      end
 
-      # Consume body to let this connection be reused
-      rbody = ""
-      response.read_body { |c| rbody << c }
-      #puts rbody
+      case @http_method
+      when "post"
+        response_future = @client.background.post(event.sprintf(@url), body: body, headers: request_headers)
+      when "put"
+        response_future = @client.background.put(event.sprintf(@url), body: body, headers: request_headers)
+      else
+        @logger.error("Unknown verb:", :verb => @http_method)
+      end
+
+      @requests.push(response_future)
     rescue Exception => e
-      @logger.warn("Unhandled exception", :request => response.request, :response => response, :exception => e, :stacktrace => e.backtrace)
+      @logger.warn("Unhandled exception", :error => e)
     end
   end # def receive
 
