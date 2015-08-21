@@ -2,8 +2,14 @@
 require "logstash/outputs/base"
 require "logstash/namespace"
 require "logstash/json"
+require "uri"
+require "logstash/plugin_mixins/http_client"
 
 class LogStash::Outputs::Http < LogStash::Outputs::Base
+  include LogStash::PluginMixins::HttpClient
+
+  VALID_METHODS = ["put", "post", "patch", "delete", "get", "head"]
+
   # This output lets you `PUT` or `POST` events to a
   # generic HTTP(S) endpoint
   #
@@ -16,12 +22,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # URL to use
   config :url, :validate => :string, :required => :true
 
-  # validate SSL?
-  config :verify_ssl, :validate => :boolean, :default => true
+  # DEPRECATED. Set 'ssl_certificate_validation' instead
+  config :verify_ssl, :validate => :boolean, :default => true, :deprecated => true
 
-  # What verb to use
-  # only put and post are supported for now
-  config :http_method, :validate => ["put", "post"], :required => :true
+  # The HTTP Verb. One of "put", "post", "patch", "delete", "get", "head"
+  config :http_method, :validate => VALID_METHODS, :required => :true
 
   # Custom headers to use
   # format is `headers => ["X-My-Header", "%{host}"]`
@@ -53,24 +58,20 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # Otherwise, the event is sent as json.
   config :format, :validate => ["json", "form", "message"], :default => "json"
 
-  # Number of concurrent requests
-  config :concurrent_requests, :validate => :number, :default => 10
-
   config :message, :validate => :string
 
-  public
   def register
-    require "manticore"
-    require "uri"
+    # Handle this deprecated option. TODO: remove the option
+    @ssl_certificate_validation = @verify_ssl if @verify_ssl
+    @http_method = @http_method.to_sym
 
-    ssl = Hash.new
-    if @verify_ssl
-      ssl["verify"] = :strict
-    else
-      ssl["verify"] = :disable
-    end
+    # We count outstanding requests with this queue
+    # This queue tracks the requests to create backpressure
+    # When this queue is empty no new requests may be sent,
+    # tokens must be added back by the client on success
+    @request_tokens = SizedQueue.new(@pool_max)
+    @pool_max.times {|t| @request_tokens << true }
 
-    @client = Manticore::Client.new pool_max: @concurrent_requests, ssl: ssl
     @requests = Array.new
 
     if @content_type.nil?
@@ -79,81 +80,100 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         when "json" ; @content_type = "application/json"
       end
     end
-    if @format == "message"
-      if @message.nil?
-        raise "message must be set if message format is used"
-      end
-      if @content_type.nil?
-        raise "content_type must be set if message format is used"
-      end
-      unless @mapping.nil?
-        @logger.warn "mapping is not supported and will be ignored if message format is used"
-      end
-    end
+
+    validate_format!
   end # def register
 
-  public
   def receive(event)
     return unless output?(event)
 
+    evt = map_event(event)
+    # TODO: Create an HTTP post data codec, use that here
+    body = if @format == "json"
+      LogStash::Json.dump(evt)
+    elsif @format == "message"
+      event.sprintf(@message)
+    else
+      encode(evt)
+    end
+
+    # Block waiting for a token
+    token = @request_tokens.pop
+
+    # Send the request
+    url = event.sprintf(@url)
+    headers = event_headers(event)
+    request = client.async.send(@http_method, url, body: body, headers: headers)
+    request.on_complete { @request_tokens << token }
+    request.on_success  do |response|
+      if response.code < 200 || response.code > 299
+        @logger.error(
+          "Encountered non-200 HTTP code #{200}",
+          :url => url,
+          :event => event)
+      end
+    end
+
+    request.on_failure do |exception|
+        @logger.error("Could not fetch URL",
+                      url: url,
+                      method: @http_method,
+                      body: body,
+                      headers: headers
+        )
+    end
+  end
+
+  private
+
+  def map_event(event)
     if @mapping
-      evt = Hash.new
-      @mapping.each do |k,v|
-        evt[k] = event.sprintf(v)
+      @mapping.reduce({}) do |acc,kv|
+        k,v = kv
+        acc[k] = event.sprintf(v)
+        acc
       end
     else
-      evt = event.to_hash
+      event.to_hash
     end
+  end
 
-    request_headers = Hash.new
-    if @headers
-      @headers.each do |k,v|
-        request_headers = event.sprintf(v)
-      end
+  def event_headers(event)
+    headers = custom_headers(event) || {}
+    headers["Content-Type"] = @content_type
+    headers
+  end
+
+  def custom_headers(event)
+    return nil unless @headers
+
+    @headers.reduce({}) do |acc,kv|
+      k,v = kv
+      acc[k] = event.sprintf(v)
+      acc
     end
-
-    request_headers["Content-Type"] = @content_type
-
-    begin
-      if @format == "json"
-        body = LogStash::Json.dump(evt)
-      elsif @format == "message"
-        body = event.sprintf(@message)
-      else
-        body = encode(evt)
-      end
-
-      if @requests.size >= @concurrent_requests
-        future = @requests.shift
-        begin
-          response = ""
-          response = future.get
-          rbody = ""
-          response.read_body { |c| rbody << c }
-          # puts rbody
-        rescue Exception => e
-          @logger.warn("Unhandled exception", :response => response, :exception => e, :stacktrace => e.backtrace)
-        end
-      end
-
-      case @http_method
-      when "post"
-        response_future = @client.background.post(event.sprintf(@url), body: body, headers: request_headers)
-      when "put"
-        response_future = @client.background.put(event.sprintf(@url), body: body, headers: request_headers)
-      else
-        @logger.error("Unknown verb:", :verb => @http_method)
-      end
-
-      @requests.push(response_future)
-    rescue Exception => e
-      @logger.warn("Unhandled exception", :error => e)
-    end
-  end # def receive
+  end
 
   def encode(hash)
     return hash.collect do |key, value|
       CGI.escape(key) + "=" + CGI.escape(value)
     end.join("&")
-  end # def encode
+  end
+
+
+  def validate_format!
+    if @format == "message"
+      if @message.nil?
+        raise "message must be set if message format is used"
+      end
+
+      if @content_type.nil?
+        raise "content_type must be set if message format is used"
+      end
+
+      unless @mapping.nil?
+        @logger.warn "mapping is not supported and will be ignored if message format is used"
+      end
+    end
+  end
 end
