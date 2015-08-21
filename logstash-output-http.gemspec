@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
 
   s.name            = 'logstash-output-http'
-  s.version         = '1.0.0'
+  s.version         = '1.1.0'
   s.licenses        = ['Apache License (2.0)']
   s.summary         = "This output lets you `PUT` or `POST` events to a generic HTTP(S) endpoint"
   s.description     = "This gem is a logstash plugin required to be installed on top of the Logstash core pipeline using $LS_HOME/bin/plugin install gemname. This gem is not a stand-alone program"
@@ -22,7 +22,7 @@ Gem::Specification.new do |s|
   # Gem dependencies
   s.add_runtime_dependency "logstash-core", '>= 1.4.0', '< 2.0.0'
 
-  s.add_runtime_dependency 'ftw', ['~> 0.0.40']
+  s.add_runtime_dependency 'manticore', ['~> 0.4.1']
 
   s.add_development_dependency 'logstash-devutils'
 end
