@@ -87,15 +87,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   def receive(event)
     return unless output?(event)
 
-    evt = map_event(event)
-    # TODO: Create an HTTP post data codec, use that here
-    body = if @format == "json"
-      LogStash::Json.dump(evt)
-    elsif @format == "message"
-      event.sprintf(@message)
-    else
-      encode(evt)
-    end
+    body = event_body(event)
 
     # Block waiting for a token
     token = @request_tokens.pop
@@ -103,28 +95,69 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     # Send the request
     url = event.sprintf(@url)
     headers = event_headers(event)
-    request = client.async.send(@http_method, url, body: body, headers: headers)
-    request.on_complete { @request_tokens << token }
-    request.on_success  do |response|
+
+    # Create an async request
+    request = client.send(@http_method, url, body: body, headers: headers, async: true)
+
+    # Invoke it using the Manticore Executor (CachedThreadPool) directly
+    request_async_background(request)
+
+    # Make sure we return the token to the pool
+    request.on_complete do
+      @request_tokens << token
+    end
+
+    request.on_success do |response|
       if response.code < 200 || response.code > 299
-        @logger.error(
+        log_failure(
           "Encountered non-200 HTTP code #{200}",
+          :response_code => response.code,
           :url => url,
           :event => event)
       end
     end
 
     request.on_failure do |exception|
-        @logger.error("Could not fetch URL",
-                      url: url,
-                      method: @http_method,
-                      body: body,
-                      headers: headers
-        )
+      log_failure("Could not fetch URL",
+                  :url => url,
+                  :method => @http_method,
+                  :body => body,
+                  :headers => headers,
+                  :message => exception.message,
+                  :class => exception.class.name,
+                  :backtrace => exception.backtrace
+      )
     end
   end
 
   private
+
+  # This is split into a separate method mostly to help testing
+  def log_failure(message, opts)
+    #puts "FAILED #{message} #{opts}"
+    @logger.error("[HTTP Output Failure] #{message}", opts)
+  end
+
+  # Manticore doesn't provide a way to attach handlers to background or async requests well
+  # It wants you to use futures. The #async method kinda works but expects single thread batches
+  # and background only returns futures.
+  # Proposed fix to manticore here: https://github.com/cheald/manticore/issues/32
+  def request_async_background(request)
+    @method ||= client.executor.java_method(:submit, [java.util.concurrent.Callable.java_class])
+    @method.call(request)
+  end
+
+  # Format the HTTP body
+  def event_body(event)
+    # TODO: Create an HTTP post data codec, use that here
+    if @format == "json"
+      LogStash::Json.dump(map_event(event))
+    elsif @format == "message"
+      event.sprintf(@message)
+    else
+      encode(map_event(mapped))
+    end
+  end
 
   def map_event(event)
     if @mapping
