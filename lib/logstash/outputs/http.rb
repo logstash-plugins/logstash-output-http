@@ -45,7 +45,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   #
   # For example:
   # [source,ruby]
-  #    mapping => ["foo", "%{host}", "bar", "%{type}"]
+  #    mapping => {"foo", "%{host}", "bar", "%{type}"}
   config :mapping, :validate => :hash
 
   # Set the format of the http body.
@@ -78,6 +78,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       case @format
         when "form" ; @content_type = "application/x-www-form-urlencoded"
         when "json" ; @content_type = "application/json"
+        when "message" ; @content_type = "text/plain"
       end
     end
 
@@ -155,7 +156,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     elsif @format == "message"
       event.sprintf(@message)
     else
-      encode(map_event(mapped))
+      encode(map_event(event))
     end
   end
 
@@ -187,9 +188,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     end
   end
 
+  #TODO Extract this to a codec
   def encode(hash)
     return hash.collect do |key, value|
-      CGI.escape(key) + "=" + CGI.escape(value)
+      CGI.escape(key) + "=" + CGI.escape(value.to_s)
     end.join("&")
   end
 
