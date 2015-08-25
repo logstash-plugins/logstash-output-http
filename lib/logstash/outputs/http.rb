@@ -23,7 +23,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   config :url, :validate => :string, :required => :true
 
   # DEPRECATED. Set 'ssl_certificate_validation' instead
-  config :verify_ssl, :validate => :boolean, :default => true, :deprecated => true
+  config :verify_ssl, :validate => :boolean, :default => true, :deprecated => "Please use 'ssl_certificate_validation' instead. This option will be removed in a future release!"
 
   # The HTTP Verb. One of "put", "post", "patch", "delete", "get", "head"
   config :http_method, :validate => VALID_METHODS, :required => :true
