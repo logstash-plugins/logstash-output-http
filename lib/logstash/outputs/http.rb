@@ -135,7 +135,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   # This is split into a separate method mostly to help testing
   def log_failure(message, opts)
-    #puts "FAILED #{message} #{opts}"
     @logger.error("[HTTP Output Failure] #{message}", opts)
   end
 
