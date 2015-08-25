@@ -10,12 +10,16 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   VALID_METHODS = ["put", "post", "patch", "delete", "get", "head"]
 
-  # This output lets you `PUT` or `POST` events to a
+  # This output lets you send events to a
   # generic HTTP(S) endpoint
   #
-  # Additionally, you are given the option to customize
-  # the headers sent as well as basic customization of the
-  # event json itself.
+  # This output will execute up to 'pool_max' requests in parallel for performance.
+  # Consider this when tuning this plugin for performance.
+  #
+  # Additionally, note that when parallel execution is used strict ordering of events is not
+  # guaranteed!
+  #
+  # Beware, this gem does not yet support codecs. Please use the 'format' option for now.
 
   config_name "http"
 
