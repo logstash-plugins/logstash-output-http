@@ -90,7 +90,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end # def register
 
   def receive(event)
-    return unless output?(event)
+    
 
     body = event_body(event)
 
