@@ -90,8 +90,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end # def register
 
   def receive(event)
-    
-
     body = event_body(event)
 
     # Block waiting for a token
@@ -104,11 +102,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     # Create an async request
     request = client.send(@http_method, url, body: body, headers: headers, async: true)
 
-    # Invoke it using the Manticore Executor (CachedThreadPool) directly
-    request_async_background(request)
+    # attach handlers before performing request
 
-    # Make sure we return the token to the pool
     request.on_complete do
+      # Make sure we return the token to the pool
       @request_tokens << token
     end
 
@@ -133,6 +130,9 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
                   :backtrace => exception.backtrace
       )
     end
+
+    # Invoke it using the Manticore Executor (CachedThreadPool) directly
+    request_async_background(request)
   end
 
   private
