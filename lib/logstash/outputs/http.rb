@@ -89,6 +89,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     validate_format!
   end # def register
 
+  # TODO: (colin) the request call sequence + async handling will have to be reworked when using
+  # Maticore >= 5.0. I will set a version constrain in the gemspec for this.
   def receive(event)
     body = event_body(event)
 
@@ -100,7 +102,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     headers = event_headers(event)
 
     # Create an async request
-    request = client.send(@http_method, url, :body => body, :headers => headers, :async_background => true)
+    request = client.send(@http_method, url, :body => body, :headers => headers, :async => true)
+
+    # with Maticore version < 0.5 using :async => true places the requests in an @async_requests
+    # list which is used & cleaned by Client#execute! but we are not using it here and we must
+    # purge it manually to avoid leaking requests.
+    client.clear_pending
 
     # attach handlers before performing request
 
