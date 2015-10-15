@@ -100,7 +100,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     headers = event_headers(event)
 
     # Create an async request
-    request = client.send(@http_method, url, body: body, headers: headers, async: true)
+    request = client.send(@http_method, url, :body => body, :headers => headers, :async_background => true)
 
     # attach handlers before performing request
 
