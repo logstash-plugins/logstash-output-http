@@ -1,3 +1,6 @@
+## 2.0.5
+ - fixed memory leak
+
 ## 2.0.3
  - fixed potential race condition on async callbacks
  - silenced specs equest logs and other spec robustness fixes
