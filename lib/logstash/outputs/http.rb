@@ -49,7 +49,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   #
   # For example:
   # [source,ruby]
-  #    mapping => {"foo", "%{host}", "bar", "%{type}"}
+  #    mapping => {"foo" => "%{host}", "bar" => "%{type}"}
   config :mapping, :validate => :hash
 
   # Set the format of the http body.
