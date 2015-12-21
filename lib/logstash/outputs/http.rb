@@ -89,31 +89,29 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     validate_format!
   end # def register
 
-  # TODO: (colin) the request call sequence + async handling will have to be reworked when using
-  # Maticore >= 5.0. I will set a version constrain in the gemspec for this.
-  def receive(event)
+  def multi_receive(events)
+    events.each {|event| receive(event, :parallel)}
+    client.execute!
+  end
+
+  # Once we no longer need to support Logstash < 2.2 (pre-ng-pipeline)
+  # We don't need to handle :background style requests
+  def receive(event, request_proxy_type=:background)
     body = event_body(event)
 
     # Block waiting for a token
-    token = @request_tokens.pop
+    token = @request_tokens.pop if request_proxy_type == :background
 
     # Send the request
     url = event.sprintf(@url)
     headers = event_headers(event)
 
     # Create an async request
-    request = client.send(@http_method, url, :body => body, :headers => headers, :async => true)
-
-    # with Maticore version < 0.5 using :async => true places the requests in an @async_requests
-    # list which is used & cleaned by Client#execute! but we are not using it here and we must
-    # purge it manually to avoid leaking requests.
-    client.clear_pending
-
-    # attach handlers before performing request
+    request = client.send(request_proxy_type).send(@http_method, url, :body => body, :headers => headers)
 
     request.on_complete do
       # Make sure we return the token to the pool
-      @request_tokens << token
+      @request_tokens << token  if request_proxy_type == :background
     end
 
     request.on_success do |response|
@@ -138,8 +136,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       )
     end
 
-    # Invoke it using the Manticore Executor (CachedThreadPool) directly
-    request_async_background(request)
+    request.call if request_proxy_type == :background
+  end
+
+  def close
+    client.close
   end
 
   private

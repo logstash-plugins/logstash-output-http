@@ -92,6 +92,8 @@ describe LogStash::Outputs::Http do
     let(:pool_max) { 10 }
     let(:num_reqs) { pool_max / 2 }
     let(:client) { subject.client }
+    let(:client_proxy) { subject.client.background }
+
     subject {
       LogStash::Outputs::Http.new("url" => url,
                                   "http_method" => method,
@@ -99,11 +101,16 @@ describe LogStash::Outputs::Http do
     }
 
     before do
+      allow(client).to receive(:background).and_return(client_proxy)
       subject.register
     end
 
+    after do
+      subject.close
+    end
+
     it "should receive all the requests" do
-      expect(client).to receive(:send).
+      expect(client_proxy).to receive(:send).
                           with(method.to_sym, url, anything).
                           exactly(num_reqs).times.
                           and_call_original
@@ -112,15 +119,17 @@ describe LogStash::Outputs::Http do
     end
   end
 
-  shared_examples("verb behavior") do |method|
+  shared_examples("verb behavior") do |method, proxy_method|
     subject { LogStash::Outputs::Http.new("url" => url, "http_method" => method, "pool_max" => 1) }
 
     let(:expected_method) { method.clone.to_sym }
     let(:client) { subject.client }
+    let(:client_proxy) { subject.client.send(proxy_method) }
 
     before do
+      allow(client).to receive(proxy_method).and_return(client_proxy)
       subject.register
-      allow(client).to receive(:send).
+      allow(client_proxy).to receive(:send).
                          with(expected_method, url, anything).
                          and_call_original
       allow(subject).to receive(:log_failure).with(any_args)
@@ -129,11 +138,11 @@ describe LogStash::Outputs::Http do
     context "performing a get" do
       describe "invoking the request" do
         before do
-          subject.receive(event)
+          subject.receive(event, proxy_method)
         end
 
         it "should execute the request" do
-          expect(client).to have_received(:send).
+          expect(client_proxy).to have_received(:send).
                               with(expected_method, url, anything)
         end
       end
@@ -152,8 +161,13 @@ describe LogStash::Outputs::Http do
         let(:url) { "http://localhost:#{port}/bad"}
 
         before do
-          subject.receive(event)
-          wait_for_request
+          subject.receive(event, proxy_method)
+
+          if proxy_method == :background
+            wait_for_request
+          else
+            subject.client.execute!
+          end
         end
 
         it "should log a failure" do
@@ -164,8 +178,12 @@ describe LogStash::Outputs::Http do
   end
 
   LogStash::Outputs::Http::VALID_METHODS.each do |method|
-    context "when using '#{method}'" do
-      include_examples("verb behavior", method)
+    context "when using '#{method}' via :background" do
+      include_examples("verb behavior", method, :background)
+    end
+
+    context "when using '#{method}' via :parallel" do
+      include_examples("verb behavior", method, :parallel)
     end
   end
 

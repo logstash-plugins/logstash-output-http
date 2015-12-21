@@ -1,3 +1,7 @@
+## 2.1.0
+ - Properly close the client on #close
+ - Optimized execution for Logstash 2.2 ng pipeline
+
 ## 2.0.5
  - fixed memory leak
 
