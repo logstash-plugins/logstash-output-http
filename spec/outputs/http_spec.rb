@@ -119,15 +119,15 @@ describe LogStash::Outputs::Http do
     end
   end
 
-  shared_examples("verb behavior") do |method, proxy_method|
+  shared_examples("verb behavior") do |method, async_type|
     subject { LogStash::Outputs::Http.new("url" => url, "http_method" => method, "pool_max" => 1) }
 
     let(:expected_method) { method.clone.to_sym }
     let(:client) { subject.client }
-    let(:client_proxy) { subject.client.send(proxy_method) }
+    let(:client_proxy) { subject.client.send(async_type) }
 
     before do
-      allow(client).to receive(proxy_method).and_return(client_proxy)
+      allow(client).to receive(async_type).and_return(client_proxy)
       subject.register
       allow(client_proxy).to receive(:send).
                          with(expected_method, url, anything).
@@ -138,7 +138,7 @@ describe LogStash::Outputs::Http do
     context "performing a get" do
       describe "invoking the request" do
         before do
-          subject.receive(event, proxy_method)
+          subject.receive(event, async_type)
         end
 
         it "should execute the request" do
@@ -161,9 +161,9 @@ describe LogStash::Outputs::Http do
         let(:url) { "http://localhost:#{port}/bad"}
 
         before do
-          subject.receive(event, proxy_method)
+          subject.receive(event, async_type)
 
-          if proxy_method == :background
+          if async_type == :background
             wait_for_request
           else
             subject.client.execute!

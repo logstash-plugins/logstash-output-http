@@ -96,22 +96,29 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   # Once we no longer need to support Logstash < 2.2 (pre-ng-pipeline)
   # We don't need to handle :background style requests
-  def receive(event, request_proxy_type=:background)
+  #
+  # We use :background style requests for Logstash < 2.2 because before the microbatching
+  # pipeline performance is greatly improved by having some degree of async behavior.
+  #
+  # In Logstash 2.2 and after things are much simpler, we just run each batch in parallel
+  # This will make performance much easier to reason about, and more importantly let us guarantee
+  # that if `multi_receive` returns all items have been sent.
+  def receive(event, async_type=:background)
     body = event_body(event)
 
     # Block waiting for a token
-    token = @request_tokens.pop if request_proxy_type == :background
+    token = @request_tokens.pop if async_type == :background
 
     # Send the request
     url = event.sprintf(@url)
     headers = event_headers(event)
 
     # Create an async request
-    request = client.send(request_proxy_type).send(@http_method, url, :body => body, :headers => headers)
+    request = client.send(async_type).send(@http_method, url, :body => body, :headers => headers)
 
     request.on_complete do
       # Make sure we return the token to the pool
-      @request_tokens << token  if request_proxy_type == :background
+      @request_tokens << token  if async_type == :background
     end
 
     request.on_success do |response|
@@ -136,7 +143,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       )
     end
 
-    request.call if request_proxy_type == :background
+    request.call if async_type == :background
   end
 
   def close
