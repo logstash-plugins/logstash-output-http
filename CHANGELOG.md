@@ -1,3 +1,6 @@
+## 2.1.1
+ - Require http_client mixin with better keepalive handling
+
 ## 2.1.0
  - Properly close the client on #close
  - Optimized execution for Logstash 2.2 ng pipeline
