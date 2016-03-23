@@ -124,7 +124,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     request.on_success do |response|
       if response.code < 200 || response.code > 299
         log_failure(
-          "Encountered non-200 HTTP code #{200}",
+          "Encountered non-200 HTTP code #{response.code}",
           :response_code => response.code,
           :url => url,
           :event => event)
