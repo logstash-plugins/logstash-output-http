@@ -248,7 +248,7 @@ describe LogStash::Outputs::Http do
       let(:config) {
         {"url" => url, "http_method" => "post", "pool_max" => 1, "format" => "message", "message" => "%{foo} AND %{baz}"}
       }
-      let(:expected_body) { "#{event["foo"]} AND #{event["baz"]}" }
+      let(:expected_body) { "#{event.get("foo")} AND #{event.get("baz")}" }
       let(:expected_content_type) { "text/plain" }
 
       include_examples("a received event")
@@ -258,7 +258,7 @@ describe LogStash::Outputs::Http do
       let(:config) {
         {"url" => url, "http_method" => "post", "pool_max" => 1, "mapping" => {"blah" => "X %{foo}"}}
       }
-      let(:expected_body) { LogStash::Json.dump("blah" => "X #{event["foo"]}") }
+      let(:expected_body) { LogStash::Json.dump("blah" => "X #{event.get("foo")}") }
       let(:expected_content_type) { "application/json" }
 
       include_examples("a received event")
