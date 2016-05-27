@@ -1,4 +1,4 @@
-## 4.0.0
+## 3.1.0
  - breaking,config: Remove deprecated config 'verify_ssl'. Please use 'ssl_certificate_validation'.
 
 ## 3.0.1
