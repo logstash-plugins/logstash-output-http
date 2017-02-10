@@ -7,8 +7,18 @@ require "logstash/plugin_mixins/http_client"
 
 class LogStash::Outputs::Http < LogStash::Outputs::Base
   include LogStash::PluginMixins::HttpClient
+  
+  concurrency :shared
 
   VALID_METHODS = ["put", "post", "patch", "delete", "get", "head"]
+  
+  RETRYABLE_MANTICORE_EXCEPTIONS = [
+    ::Manticore::Timeout,
+    ::Manticore::SocketException,
+    ::Manticore::ClientProtocolException, 
+    ::Manticore::ResolutionFailure, 
+    ::Manticore::SocketTimeout
+  ]
 
   # This output lets you send events to a
   # generic HTTP(S) endpoint
@@ -40,6 +50,16 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # * if format is "json", "application/json"
   # * if format is "form", "application/x-www-form-urlencoded"
   config :content_type, :validate => :string
+  
+  # Set this to false if you don't want this output to retry failed requests
+  config :retry_failed, :validate => :boolean, :default => true
+  
+  # If encountered as response codes this plugin will retry these requests
+  config :retryable_codes, :validate => :number, :list => true, :default => [429, 500, 502, 503, 504]
+  
+  # If you would like to consider some non-2xx codes to be successes 
+  # enumerate them here. Responses returning these codes will be considered successes
+  config :ignorable_codes, :validate => :number, :list => true
 
   # This lets you choose the structure and parts of the event that are sent.
   #
@@ -83,70 +103,181 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     end
 
     validate_format!
+    
+    # Run named Timer as daemon thread
+    @timer = java.util.Timer.new("HTTP Output #{self.params['id']}", true)
   end # def register
 
   def multi_receive(events)
-    events.each {|event| receive(event, :parallel)}
-    client.execute!
+    send_events(events)
   end
-
-  # Once we no longer need to support Logstash < 2.2 (pre-ng-pipeline)
-  # We don't need to handle :background style requests
-  #
-  # We use :background style requests for Logstash < 2.2 because before the microbatching
-  # pipeline performance is greatly improved by having some degree of async behavior.
-  #
-  # In Logstash 2.2 and after things are much simpler, we just run each batch in parallel
-  # This will make performance much easier to reason about, and more importantly let us guarantee
-  # that if `multi_receive` returns all items have been sent.
-  def receive(event, async_type=:background)
+  
+  class RetryTimerTask < java.util.TimerTask
+    def initialize(pending, event, attempt)
+      @pending = pending
+      @event = event
+      @attempt = attempt
+      super()
+    end
+    
+    def run
+      @pending << [@event, @attempt]
+    end
+  end
+  
+  def send_events(events)
+    successes = java.util.concurrent.atomic.AtomicInteger.new(0)
+    failures  = java.util.concurrent.atomic.AtomicInteger.new(0)
+    retries = java.util.concurrent.atomic.AtomicInteger.new(0)
+    
+    pending = Queue.new
+    events.each {|e| pending << [e, 0]}
+    
+    while popped = pending.pop
+      break if popped == :done
+      
+      event, attempt = popped
+      
+      send_event(event, attempt) do |action,event,attempt|
+        begin 
+          action = :failure if action == :retry && !@retry_failed
+          
+          case action
+          when :success
+            successes.incrementAndGet
+          when :retry
+            retries.incrementAndGet
+            
+            next_attempt = attempt+1
+            sleep_for = sleep_for_attempt(next_attempt)
+            @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
+            timer_task = RetryTimerTask.new(pending, event, next_attempt)
+            @timer.schedule(timer_task, sleep_for*1000)
+          when :failure 
+            failures.incrementAndGet
+          else
+            raise "Unknown action #{action}"
+          end
+          
+          if action == :success || action == :failure 
+            if successes.get+failures.get == events.size
+              pending << :done
+            end
+          end
+        rescue => e 
+          # This should never happen unless there's a flat out bug in the code
+          @logger.error("Error sending HTTP Request",
+            :class => e.class.name,
+            :message => e.message,
+            :backtrace => e.backtrace)
+          failures.incrementAndGet
+          raise e
+        end
+      end
+    end
+  rescue => e
+    @logger.error("Error in http output loop",
+            :class => e.class.name,
+            :message => e.message,
+            :backtrace => e.backtrace)
+    raise e
+  end
+  
+  def sleep_for_attempt(attempt)
+    sleep_for = attempt**2
+    sleep_for = sleep_for <= 60 ? sleep_for : 60
+    (sleep_for/2) + (rand(0..sleep_for)/2)
+  end
+  
+  def send_event(event, attempt)
     body = event_body(event)
-
-    # Block waiting for a token
-    token = @request_tokens.pop if async_type == :background
 
     # Send the request
     url = event.sprintf(@url)
     headers = event_headers(event)
 
     # Create an async request
-    request = client.send(async_type).send(@http_method, url, :body => body, :headers => headers)
-
-    request.on_complete do
-      # Make sure we return the token to the pool
-      @request_tokens << token  if async_type == :background
-    end
+    request = client.background.send(@http_method, url, :body => body, :headers => headers)
+    request.call # Actually invoke the request in the background
 
     request.on_success do |response|
-      if response.code < 200 || response.code > 299
-        log_failure(
-          "Encountered non-200 HTTP code #{response.code}",
-          :response_code => response.code,
-          :url => url,
-          :event => event.to_hash)
+      begin
+        if !response_success?(response)
+          will_retry = retryable_response?(response)
+          log_failure(
+            "Encountered non-2xx HTTP code #{response.code}",
+            :response_code => response.code,
+            :url => url,
+            :event => event,
+            :will_retry => will_retry
+          )
+          
+          if will_retry 
+            yield :retry, event, attempt
+          else
+            yield :failure, event, attempt
+          end
+        else
+          yield :success, event, attempt
+        end
+      rescue => e 
+        # Shouldn't ever happen
+        @logger.error("Unexpected error in request success!",
+          :class => e.class.name,
+          :message => e.message,
+          :backtrace => e.backtrace)
       end
     end
 
     request.on_failure do |exception|
-      log_failure("Could not fetch URL",
-                  :url => url,
-                  :method => @http_method,
-                  :body => body,
-                  :headers => headers,
-                  :message => exception.message,
-                  :class => exception.class.name,
-                  :backtrace => exception.backtrace
-      )
+      begin 
+        will_retry = retryable_exception?(exception)
+        log_failure("Could not fetch URL",
+                    :url => url,
+                    :method => @http_method,
+                    :body => body,
+                    :headers => headers,
+                    :message => exception.message,
+                    :class => exception.class.name,
+                    :backtrace => exception.backtrace,
+                    :will_retry => will_retry
+        )
+        
+        if will_retry
+          yield :retry, event, attempt
+        else
+          yield :failure, event, attempt
+        end
+      rescue => e 
+        # Shouldn't ever happen
+        @logger.error("Unexpected error in request failure!",
+          :class => e.class.name,
+          :message => e.message,
+          :backtrace => e.backtrace)
+        end
     end
-
-    request.call if async_type == :background
   end
 
   def close
+    @timer.cancel
     client.close
   end
 
   private
+  
+  def response_success?(response)
+    code = response.code
+    return true if @ignorable_codes && @ignorable_codes.include?(code)
+    return code >= 200 && code <= 299
+  end
+  
+  def retryable_response?(response)
+    @retryable_codes.include?(response.code)
+  end
+  
+  def retryable_exception?(exception)
+    RETRYABLE_MANTICORE_EXCEPTIONS.any? {|me| exception.is_a?(me) }
+  end
 
   # This is split into a separate method mostly to help testing
   def log_failure(message, opts)

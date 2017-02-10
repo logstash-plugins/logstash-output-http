@@ -1,5 +1,6 @@
 require "logstash/devutils/rspec/spec_helper"
 require "logstash/outputs/http"
+require "logstash/codecs/plain"
 require "thread"
 require "sinatra"
 
@@ -37,6 +38,14 @@ class TestApp < Sinatra::Base
   def self.last_request
     @last_request
   end
+  
+  def self.retry_fail_count=(count)
+    @retry_fail_count = count
+  end
+  
+  def self.retry_fail_count()
+    @retry_fail_count
+  end
 
   multiroute(%w(get post put patch delete), "/good") do
     self.class.last_request = request
@@ -45,7 +54,18 @@ class TestApp < Sinatra::Base
 
   multiroute(%w(get post put patch delete), "/bad") do
     self.class.last_request = request
-    [500, "YUP"]
+    [400, "YUP"]
+  end
+  
+  multiroute(%w(get post put patch delete), "/retry") do
+    self.class.last_request = request
+    
+    if self.class.retry_fail_count > 0
+      self.class.retry_fail_count -= 1
+      [429, "Will succeed in #{self.class.retry_fail_count}"]
+    else
+      [200, "Done Retrying"]
+    end
   end
 end
 
@@ -54,80 +74,48 @@ RSpec.configure do |config|
   def sinatra_run_wait(app, opts)
     queue = Queue.new
 
-    Thread.new(queue) do |queue|
-      begin
-        app.run!(opts) do |server|
-          queue.push("started")
+    t = java.lang.Thread.new(
+      proc do
+        begin
+          app.run!(opts) do |server|
+            queue.push("started")
+          end
+        rescue => e 
+          puts "Error in webserver thread #{e}"
+          # ignore
         end
-      rescue
-        # ignore
       end
-    end
-
+    )
+    t.daemon = true
+    t.start
     queue.pop # blocks until the run! callback runs
   end
 
   config.before(:suite) do
     sinatra_run_wait(TestApp, :port => PORT, :server => 'webrick')
+    puts "Test webserver on port #{PORT}"
   end
 end
 
 describe LogStash::Outputs::Http do
   # Wait for the async request to finish in this spinlock
   # Requires pool_max to be 1
-  def wait_for_request
-
-    loop do
-      sleep(0.1)
-      break if subject.request_tokens.size > 0
-    end
-  end
 
   let(:port) { PORT }
   let(:event) { LogStash::Event.new("message" => "hi") }
   let(:url) { "http://localhost:#{port}/good" }
   let(:method) { "post" }
 
-  describe "when num requests > token count" do
-    let(:pool_max) { 10 }
-    let(:num_reqs) { pool_max / 2 }
-    let(:client) { subject.client }
-    let(:client_proxy) { subject.client.background }
-
-    subject {
-      LogStash::Outputs::Http.new("url" => url,
-                                  "http_method" => method,
-                                  "pool_max" => pool_max)
-    }
-
-    before do
-      allow(client).to receive(:background).and_return(client_proxy)
-      subject.register
-    end
-
-    after do
-      subject.close
-    end
-
-    it "should receive all the requests" do
-      expect(client_proxy).to receive(:send).
-                          with(method.to_sym, url, anything).
-                          exactly(num_reqs).times.
-                          and_call_original
-
-      num_reqs.times {|t| subject.receive(event)}
-    end
-  end
-
-  shared_examples("verb behavior") do |method, async_type|
-    subject { LogStash::Outputs::Http.new("url" => url, "http_method" => method, "pool_max" => 1) }
+  shared_examples("verb behavior") do |method|
+    let(:verb_behavior_config) { {"url" => url, "http_method" => method, "pool_max" => 1} }
+    subject { LogStash::Outputs::Http.new(verb_behavior_config) }
 
     let(:expected_method) { method.clone.to_sym }
     let(:client) { subject.client }
-    let(:client_proxy) { subject.client.send(async_type) }
+    let(:client_proxy) { subject.client.background }
 
     before do
-      allow(client).to receive(async_type).and_return(client_proxy)
+      allow(client).to receive(:background).and_return(client_proxy)
       subject.register
       allow(client_proxy).to receive(:send).
                          with(expected_method, url, anything).
@@ -138,7 +126,7 @@ describe LogStash::Outputs::Http do
     context "performing a get" do
       describe "invoking the request" do
         before do
-          subject.receive(event, async_type)
+          subject.multi_receive([event])
         end
 
         it "should execute the request" do
@@ -149,7 +137,7 @@ describe LogStash::Outputs::Http do
 
       context "with passing requests" do
         before do
-          subject.receive(event)
+          subject.multi_receive([event])
         end
 
         it "should not log a failure" do
@@ -161,29 +149,51 @@ describe LogStash::Outputs::Http do
         let(:url) { "http://localhost:#{port}/bad"}
 
         before do
-          subject.receive(event, async_type)
-
-          if async_type == :background
-            wait_for_request
-          else
-            subject.client.execute!
-          end
+          subject.multi_receive([event])
         end
 
         it "should log a failure" do
           expect(subject).to have_received(:log_failure).with(any_args)
         end
       end
+      
+      context "with ignorable failing requests" do
+        let(:url) { "http://localhost:#{port}/bad"}
+        let(:verb_behavior_config) { super.merge("ignorable_codes" => [400]) }
+
+        before do
+          subject.multi_receive([event])
+        end
+
+        it "should log a failure" do
+          expect(subject).not_to have_received(:log_failure).with(any_args)
+        end
+      end
+      
+      context "with retryable failing requests" do
+        let(:url) { "http://localhost:#{port}/retry"}
+
+        before do
+          TestApp.retry_fail_count=2
+          allow(subject).to receive(:send_event).and_call_original
+          subject.multi_receive([event])
+        end
+
+        it "should log a failure 2 times" do
+          expect(subject).to have_received(:log_failure).with(any_args).twice
+        end
+        
+        it "should make three total requests" do
+          expect(subject).to have_received(:send_event).exactly(3).times
+        end
+      end  
+      
     end
   end
 
   LogStash::Outputs::Http::VALID_METHODS.each do |method|
-    context "when using '#{method}' via :background" do
-      include_examples("verb behavior", method, :background)
-    end
-
-    context "when using '#{method}' via :parallel" do
-      include_examples("verb behavior", method, :parallel)
+    context "when using '#{method}'" do
+      include_examples("verb behavior", method)
     end
   end
 
@@ -193,8 +203,7 @@ describe LogStash::Outputs::Http do
     end
 
     before do
-      subject.receive(event)
-      wait_for_request
+      subject.multi_receive([event])
     end
 
     let(:last_request) { TestApp.last_request }
