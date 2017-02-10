@@ -1,3 +1,8 @@
+## 4.0.0
+ - Major overhaul of internals, adds new retry options
+ - Allow users to specify non-standard response codes as ignorable
+ - Set concurrency level to shared allowing for greater efficiency across threads
+ 
 ## 3.1.1
   - Relax constraint on logstash-core-plugin-api to >= 1.60 <= 2.99
 
@@ -19,6 +24,7 @@
 ## 2.1.1
  - Require http_client mixin with better keepalive handling
 
+
 ## 2.1.0
  - Properly close the client on #close
  - Optimized execution for Logstash 2.2 ng pipeline
@@ -39,4 +45,3 @@
  - Concurrent execution
  - Add many HTTP options via the http_client mixin
  - Switch to manticore as HTTP Client
- 
