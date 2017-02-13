@@ -1,3 +1,6 @@
+## 4.1.0
+ - Allow nested field definitions in `mappings`
+
 ## 4.0.0
  - Major overhaul of internals, adds new retry options
  - Allow users to specify non-standard response codes as ignorable
