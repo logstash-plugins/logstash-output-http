@@ -66,7 +66,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   #
   # For example:
   # [source,ruby]
-  #    mapping => {"foo" => "%{host}" 
+  #    mapping => {"foo" => "%{host}"
   #               "bar" => "%{type}"}
   config :mapping, :validate => :hash
 
@@ -305,11 +305,27 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     end
   end
 
+  def reduce_hash(hash, event)
+    hash.reduce({}) do |acc, kv|
+      k, v = kv
+      if v.is_a?(Hash)
+        acc[k] = reduce_hash(v, event)
+      else
+        acc[k] = event.sprintf(v)
+      end
+      acc
+    end
+  end
+
   def map_event(event)
     if @mapping
       @mapping.reduce({}) do |acc,kv|
         k,v = kv
-        acc[k] = event.sprintf(v)
+        if v.is_a?(Hash)
+          acc[k] = reduce_hash(v, event)
+        else
+          acc[k] = event.sprintf(v)
+        end
         acc
       end
     else

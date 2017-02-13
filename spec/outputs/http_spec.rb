@@ -102,7 +102,9 @@ describe LogStash::Outputs::Http do
   # Requires pool_max to be 1
 
   let(:port) { PORT }
-  let(:event) { LogStash::Event.new("message" => "hi") }
+  let(:event) {
+    LogStash::Event.new({"message" => "hi"})
+  }
   let(:url) { "http://localhost:#{port}/good" }
   let(:method) { "post" }
 
@@ -225,7 +227,9 @@ describe LogStash::Outputs::Http do
 
   describe "integration tests" do
     let(:url) { "http://localhost:#{port}/good" }
-    let(:event) { LogStash::Event.new("foo" => "bar", "baz" => "bot")}
+    let(:event) {
+      LogStash::Event.new("foo" => "bar", "baz" => "bot", "user" => "McBest")
+    }
 
     subject { LogStash::Outputs::Http.new(config) }
 
@@ -265,9 +269,36 @@ describe LogStash::Outputs::Http do
 
     describe "sending a mapped event" do
       let(:config) {
-        {"url" => url, "http_method" => "post", "pool_max" => 1, "mapping" => {"blah" => "X %{foo}"}}
+        {"url" => url, "http_method" => "post", "pool_max" => 1, "mapping" => {"blah" => "X %{foo}"} }
       }
       let(:expected_body) { LogStash::Json.dump("blah" => "X #{event.get("foo")}") }
+      let(:expected_content_type) { "application/json" }
+
+      include_examples("a received event")
+    end
+
+    describe "sending a mapped, nested event" do
+      let(:config) {
+        {
+          "url" => url,
+          "http_method" => "post",
+          "pool_max" => 1,
+          "mapping" => {
+            "host" => "X %{foo}",
+            "event" => {
+              "user" => "Y %{user}"
+            }
+          }
+        }
+      }
+      let(:expected_body) {
+        LogStash::Json.dump({
+          "host" => "X #{event.get("foo")}",
+          "event" => {
+            "user" => "Y #{event.get("user")}"
+          }
+        })
+      }
       let(:expected_content_type) { "application/json" }
 
       include_examples("a received event")
