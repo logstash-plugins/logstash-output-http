@@ -287,7 +287,10 @@ describe LogStash::Outputs::Http do
             "host" => "X %{foo}",
             "event" => {
               "user" => "Y %{user}"
-            }
+            },
+            "arrayevent" => [{
+              "user" => "Z %{user}"
+            }]
           }
         }
       }
@@ -296,7 +299,10 @@ describe LogStash::Outputs::Http do
           "host" => "X #{event.get("foo")}",
           "event" => {
             "user" => "Y #{event.get("user")}"
-          }
+          },
+          "arrayevent" => [{
+            "user" => "Z #{event.get("user")}"
+          }]
         })
       }
       let(:expected_content_type) { "application/json" }

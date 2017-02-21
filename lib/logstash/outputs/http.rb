@@ -305,29 +305,23 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     end
   end
 
-  def reduce_hash(hash, event)
-    hash.reduce({}) do |acc, kv|
-      k, v = kv
-      if v.is_a?(Hash)
-        acc[k] = reduce_hash(v, event)
-      else
-        acc[k] = event.sprintf(v)
+  def convert_mapping(mapping, event)
+    if mapping.is_a?(Hash)
+      mapping.reduce({}) do |acc, kv|
+        k, v = kv
+        acc[k] = convert_mapping(v, event)
+        acc
       end
-      acc
+    elsif mapping.is_a?(Array)
+      mapping.map { |elem| convert_mapping(elem, event) }
+    else
+      event.sprintf(mapping)
     end
   end
 
   def map_event(event)
     if @mapping
-      @mapping.reduce({}) do |acc,kv|
-        k,v = kv
-        if v.is_a?(Hash)
-          acc[k] = reduce_hash(v, event)
-        else
-          acc[k] = event.sprintf(v)
-        end
-        acc
-      end
+      convert_mapping(@mapping, event)
     else
       event.to_hash
     end
