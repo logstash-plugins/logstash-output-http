@@ -1,3 +1,5 @@
+## 4.2.0
+ - Allow nested array in field definition, See https://github.com/logstash-plugins/logstash-output-http/pull/53
 ## 4.1.0
  - Allow nested field definitions in `mappings`
 
