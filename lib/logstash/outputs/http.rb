@@ -256,7 +256,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         end
     end
 
-    request.call # Actually invoke the request in the background
+    # Actually invoke the request in the background
+    # Note: this must only be invoked after all handlers are defined, otherwise
+    # those handlers are not guaranteed to be called!
+    request.call 
   end
 
   def close
