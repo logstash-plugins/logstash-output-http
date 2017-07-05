@@ -285,15 +285,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     @logger.error("[HTTP Output Failure] #{message}", opts)
   end
 
-  # Manticore doesn't provide a way to attach handlers to background or async requests well
-  # It wants you to use futures. The #async method kinda works but expects single thread batches
-  # and background only returns futures.
-  # Proposed fix to manticore here: https://github.com/cheald/manticore/issues/32
-  def request_async_background(request)
-    @method ||= client.executor.java_method(:submit, [java.util.concurrent.Callable.java_class])
-    @method.call(request)
-  end
-
   # Format the HTTP body
   def event_body(event)
     # TODO: Create an HTTP post data codec, use that here
