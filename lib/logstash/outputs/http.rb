@@ -170,7 +170,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
             :class => e.class.name,
             :message => e.message,
             :backtrace => e.backtrace)
-          failures.incrementAndGet
+          failures.increment AndGet
           raise e
         end
       end
@@ -198,8 +198,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     # Create an async request
     request = client.background.send(@http_method, url, :body => body, :headers => headers)
-    request.call # Actually invoke the request in the background
-
     request.on_success do |response|
       begin
         if !response_success?(response)
@@ -256,6 +254,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           :backtrace => e.backtrace)
         end
     end
+    request.call # Actually invoke the request in the background
   end
 
   def close
