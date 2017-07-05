@@ -198,7 +198,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     # Create an async request
     request = client.background.send(@http_method, url, :body => body, :headers => headers)
-    request.call # Actually invoke the request in the background
 
     request.on_success do |response|
       begin
@@ -256,6 +255,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           :backtrace => e.backtrace)
         end
     end
+
+    request.call # Actually invoke the request in the background
   end
 
   def close
