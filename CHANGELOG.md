@@ -1,3 +1,6 @@
+## 4.3.1
+ - Fix deadlock that could occur in certain odd situations. If you noticed this plugin stalling this should fix it.
+
 ## 4.3.0
  - Add `user` and `password` options to support HTTP basic auth
  
