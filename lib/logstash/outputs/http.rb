@@ -198,7 +198,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     # Create an async request
     request = client.background.send(@http_method, url, :body => body, :headers => headers)
-    request.call # Actually invoke the request in the background
 
     request.on_success do |response|
       begin
@@ -256,6 +255,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           :backtrace => e.backtrace)
         end
     end
+
+    # Actually invoke the request in the background
+    # Note: this must only be invoked after all handlers are defined, otherwise
+    # those handlers are not guaranteed to be called!
+    request.call 
   end
 
   def close
@@ -282,15 +286,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # This is split into a separate method mostly to help testing
   def log_failure(message, opts)
     @logger.error("[HTTP Output Failure] #{message}", opts)
-  end
-
-  # Manticore doesn't provide a way to attach handlers to background or async requests well
-  # It wants you to use futures. The #async method kinda works but expects single thread batches
-  # and background only returns futures.
-  # Proposed fix to manticore here: https://github.com/cheald/manticore/issues/32
-  def request_async_background(request)
-    @method ||= client.executor.java_method(:submit, [java.util.concurrent.Callable.java_class])
-    @method.call(request)
   end
 
   # Format the HTTP body
