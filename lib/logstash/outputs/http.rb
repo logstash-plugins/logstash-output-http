@@ -4,6 +4,7 @@ require "logstash/namespace"
 require "logstash/json"
 require "uri"
 require "logstash/plugin_mixins/http_client"
+require "zlib"
 
 class LogStash::Outputs::Http < LogStash::Outputs::Base
   include LogStash::PluginMixins::HttpClient
@@ -80,6 +81,9 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # Otherwise, the event is sent as json.
   config :format, :validate => ["json", "form", "message"], :default => "json"
 
+  # Set this to true if you want to enable gzip compression for your message
+  config :compression, :validate => :boolean
+  
   config :message, :validate => :string
 
   def register
@@ -196,6 +200,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     url = event.sprintf(@url)
     headers = event_headers(event)
 
+    # Compress the body and add appropriate header
+    if @compression == true
+      headers["Content-Encoding"] = "gzip"
+      body = gzip(body)
+    end
+
     # Create an async request
     request = client.background.send(@http_method, url, :body => body, :headers => headers)
     request.call # Actually invoke the request in the background
@@ -303,6 +313,15 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     else
       encode(map_event(event))
     end
+  end
+
+  # gzip data
+  def gzip(data)
+    gz = StringIO.new
+    z = Zlib::GzipWriter.new(gz)
+    z.write(data)
+    z.close
+    gz.string
   end
 
   def convert_mapping(mapping, event)
