@@ -1,3 +1,9 @@
+## 4.3.3
+ - Docs: Add plugin description.
+
+## 4.3.2
+ - Docs: Update plugin title.
+
 ## 4.3.1
  - Fix deadlock that could occur in certain situations. All users should upgrade to the latest version.
    This deadlock was caused by certain async HTTP APIs being called out of order thus creating a race.
