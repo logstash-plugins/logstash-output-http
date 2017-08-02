@@ -1,3 +1,6 @@
+## 5.0.0
+ - Breaking: bump dependency in breaking version of logstash-mixin-http_client
+
 ## 4.3.3
  - Docs: Add plugin description.
 
