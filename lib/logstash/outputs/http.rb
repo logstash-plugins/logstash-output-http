@@ -163,6 +163,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
             if successes.get+failures.get == events.size
               pending << :done
             end
+
+            if retries.get == @automatic_retries.to_i
+              pending << :done
+            end
           end
         rescue => e 
           # This should never happen unless there's a flat out bug in the code
