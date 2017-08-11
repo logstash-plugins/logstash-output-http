@@ -163,10 +163,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
             if successes.get+failures.get == events.size
               pending << :done
             end
-
-            if retries.get >= @automatic_retries.to_i
-              pending << :done
-            end
           end
         rescue => e 
           # This should never happen unless there's a flat out bug in the code
@@ -206,7 +202,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     request.on_success do |response|
       begin
         if !response_success?(response)
-          will_retry = retryable_response?(response)
+          will_retry = attempt <= @automatic_retries.to_i && retryable_response?(response)
           log_failure(
             "Encountered non-2xx HTTP code #{response.code}",
             :response_code => response.code,
@@ -234,7 +230,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     request.on_failure do |exception|
       begin 
-        will_retry = attempt < @automatic_retries && retryable_exception?(exception)
+        will_retry = attempt <= @automatic_retries.to_i && retryable_exception?(exception)
         log_failure("Could not fetch URL",
                     :url => url,
                     :method => @http_method,
