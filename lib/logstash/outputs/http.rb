@@ -164,7 +164,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
               pending << :done
             end
 
-            if retries.get == @automatic_retries.to_i
+            if retries.get >= @automatic_retries.to_i
               pending << :done
             end
           end
