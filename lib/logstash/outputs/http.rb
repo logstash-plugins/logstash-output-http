@@ -234,7 +234,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     request.on_failure do |exception|
       begin 
-        will_retry = retryable_exception?(exception)
+        will_retry = attempt < @automatic_retries && retryable_exception?(exception)
         log_failure("Could not fetch URL",
                     :url => url,
                     :method => @http_method,
