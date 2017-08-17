@@ -1,3 +1,6 @@
+## 4.3.4
+ - Docs fixes
+
 ## 4.3.3
  - Docs: Add plugin description.
 
