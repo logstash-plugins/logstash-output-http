@@ -313,6 +313,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # gzip data
   def gzip(data)
     gz = StringIO.new
+    gz.set_encoding("BINARY")
     z = Zlib::GzipWriter.new(gz)
     z.write(data)
     z.close
