@@ -40,6 +40,7 @@ This plugin supports the following configuration options plus the <<plugins-{typ
 | <<plugins-{type}s-{plugin}-follow_redirects>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-format>> |<<string,string>>, one of `["json", "form", "message"]`|No
 | <<plugins-{type}s-{plugin}-headers>> |<<hash,hash>>|No
+| <<plugins-{type}s-{plugin}-http_compression>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-http_method>> |<<string,string>>, one of `["put", "post", "patch", "delete", "get", "head"]`|Yes
 | <<plugins-{type}s-{plugin}-ignorable_codes>> |<<number,number>>|No
 | <<plugins-{type}s-{plugin}-keepalive>> |<<boolean,boolean>>|No
@@ -164,6 +165,15 @@ Otherwise, the event is sent as json.
 
 Custom headers to use
 format is `headers => ["X-My-Header", "%{host}"]`
+
+[id="plugins-{type}s-{plugin}-http_compression"]
+===== `http_compression`
+
+  * Value type is <<boolean,boolean>>
+  * Default value is `false`
+
+Enable request compression support. With this enabled the plugin will compress
+http requests using gzip.
 
 [id="plugins-{type}s-{plugin}-http_method"]
 ===== `http_method` 

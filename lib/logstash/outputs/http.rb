@@ -81,8 +81,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # Otherwise, the event is sent as json.
   config :format, :validate => ["json", "form", "message"], :default => "json"
 
-  # Set this to true if you want to enable gzip compression for your message
-  config :compression, :validate => :boolean
+  # Set this to true if you want to enable gzip compression for your http requests
+  config :http_compression, :validate => :boolean, :default => false
   
   config :message, :validate => :string
 
@@ -201,7 +201,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     headers = event_headers(event)
 
     # Compress the body and add appropriate header
-    if @compression == true
+    if @http_compression == true
       headers["Content-Encoding"] = "gzip"
       body = gzip(body)
     end
