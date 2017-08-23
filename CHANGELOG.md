@@ -1,3 +1,6 @@
+## 4.4.0
+  - Adding a new option `http_compression` for sending compressed payload with the `Content-Encoding: gzip` header to the configured http endpoint #66
+
 ## 4.3.4
  - Docs fixes
 
