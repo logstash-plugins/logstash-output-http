@@ -3,6 +3,7 @@ require "logstash/outputs/http"
 require "logstash/codecs/plain"
 require "thread"
 require "sinatra"
+require_relative "../supports/compressed_requests"
 
 PORT = rand(65535-1024) + 1025
 
@@ -16,8 +17,10 @@ end
 #
 # == Sinatra (v1.4.6) has taken the stage on 51572 for development with backup from WEBrick
 # == Sinatra has ended his set (crowd applauds)
-
+#
 class TestApp < Sinatra::Base
+  # on the fly uncompress gzip content
+  use CompressedRequests
 
   # disable WEBrick logging
   def self.server_settings
@@ -38,11 +41,11 @@ class TestApp < Sinatra::Base
   def self.last_request
     @last_request
   end
-  
+
   def self.retry_fail_count=(count)
     @retry_fail_count = count
   end
-  
+
   def self.retry_fail_count()
     @retry_fail_count
   end
@@ -56,10 +59,10 @@ class TestApp < Sinatra::Base
     self.class.last_request = request
     [400, "YUP"]
   end
-  
+
   multiroute(%w(get post put patch delete), "/retry") do
     self.class.last_request = request
-    
+
     if self.class.retry_fail_count > 0
       self.class.retry_fail_count -= 1
       [429, "Will succeed in #{self.class.retry_fail_count}"]
@@ -80,7 +83,7 @@ RSpec.configure do |config|
           app.run!(opts) do |server|
             queue.push("started")
           end
-        rescue => e 
+        rescue => e
           puts "Error in webserver thread #{e}"
           # ignore
         end
@@ -158,7 +161,7 @@ describe LogStash::Outputs::Http do
           expect(subject).to have_received(:log_failure).with(any_args)
         end
       end
-      
+
       context "with ignorable failing requests" do
         let(:url) { "http://localhost:#{port}/bad"}
         let(:verb_behavior_config) { super.merge("ignorable_codes" => [400]) }
@@ -171,7 +174,7 @@ describe LogStash::Outputs::Http do
           expect(subject).not_to have_received(:log_failure).with(any_args)
         end
       end
-      
+
       context "with retryable failing requests" do
         let(:url) { "http://localhost:#{port}/retry"}
 
@@ -184,12 +187,12 @@ describe LogStash::Outputs::Http do
         it "should log a failure 2 times" do
           expect(subject).to have_received(:log_failure).with(any_args).twice
         end
-        
+
         it "should make three total requests" do
           expect(subject).to have_received(:send_event).exactly(3).times
         end
-      end  
-      
+      end
+
     end
   end
 
@@ -225,7 +228,8 @@ describe LogStash::Outputs::Http do
     end
   end
 
-  describe "integration tests" do
+  shared_examples "integration tests" do
+    let(:base_config) { {} }
     let(:url) { "http://localhost:#{port}/good" }
     let(:event) {
       LogStash::Event.new("foo" => "bar", "baz" => "bot", "user" => "McBest")
@@ -239,7 +243,7 @@ describe LogStash::Outputs::Http do
 
     describe "sending with the default (JSON) config" do
       let(:config) {
-        {"url" => url, "http_method" => "post", "pool_max" => 1}
+        base_config.merge({"url" => url, "http_method" => "post", "pool_max" => 1})
       }
       let(:expected_body) { LogStash::Json.dump(event) }
       let(:expected_content_type) { "application/json" }
@@ -249,7 +253,7 @@ describe LogStash::Outputs::Http do
 
     describe "sending the event as a form" do
       let(:config) {
-        {"url" => url, "http_method" => "post", "pool_max" => 1, "format" => "form"}
+        base_config.merge({"url" => url, "http_method" => "post", "pool_max" => 1, "format" => "form"})
       }
       let(:expected_body) { subject.send(:encode, event.to_hash) }
       let(:expected_content_type) { "application/x-www-form-urlencoded" }
@@ -259,7 +263,7 @@ describe LogStash::Outputs::Http do
 
     describe "sending the event as a message" do
       let(:config) {
-        {"url" => url, "http_method" => "post", "pool_max" => 1, "format" => "message", "message" => "%{foo} AND %{baz}"}
+        base_config.merge({"url" => url, "http_method" => "post", "pool_max" => 1, "format" => "message", "message" => "%{foo} AND %{baz}"})
       }
       let(:expected_body) { "#{event.get("foo")} AND #{event.get("baz")}" }
       let(:expected_content_type) { "text/plain" }
@@ -269,7 +273,7 @@ describe LogStash::Outputs::Http do
 
     describe "sending a mapped event" do
       let(:config) {
-        {"url" => url, "http_method" => "post", "pool_max" => 1, "mapping" => {"blah" => "X %{foo}"} }
+        base_config.merge({"url" => url, "http_method" => "post", "pool_max" => 1, "mapping" => {"blah" => "X %{foo}"} })
       }
       let(:expected_body) { LogStash::Json.dump("blah" => "X #{event.get("foo")}") }
       let(:expected_content_type) { "application/json" }
@@ -279,7 +283,7 @@ describe LogStash::Outputs::Http do
 
     describe "sending a mapped, nested event" do
       let(:config) {
-        {
+        base_config.merge({
           "url" => url,
           "http_method" => "post",
           "pool_max" => 1,
@@ -292,7 +296,7 @@ describe LogStash::Outputs::Http do
               "user" => "Z %{user}"
             }]
           }
-        }
+        })
       }
       let(:expected_body) {
         LogStash::Json.dump({
@@ -308,6 +312,16 @@ describe LogStash::Outputs::Http do
       let(:expected_content_type) { "application/json" }
 
       include_examples("a received event")
+    end
+  end
+
+  describe "integration test without gzip compression" do
+    include_examples("integration tests")
+  end
+
+  describe "integration test with gzip compression" do
+    include_examples("integration tests") do
+      let(:base_config) { { "http_compression" => true } }
     end
   end
 end
