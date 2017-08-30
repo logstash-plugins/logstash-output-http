@@ -1,3 +1,6 @@
+## 4.4.1
+  - relax dependency on logstash-mixin-http_client, to allow 4.4+ to be installed with LS 5.x
+
 ## 4.4.0
   - Adding a new option `http_compression` for sending compressed payload with the `Content-Encoding: gzip` header to the configured http endpoint #66
 
