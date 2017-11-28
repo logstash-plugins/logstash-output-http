@@ -40,6 +40,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # The HTTP Verb. One of "put", "post", "patch", "delete", "get", "head"
   config :http_method, :validate => VALID_METHODS, :required => :true
 
+  # Basic auth headers to use.
+  # For example:
+  # [source, ruby]
+  # auth => { user: 'foo', password: 'bar' }
+  config :auth, :validate => :hash
+
   # Custom headers to use
   # format is `headers => ["X-My-Header", "%{host}"]`
   config :headers, :validate => :hash
