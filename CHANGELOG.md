@@ -1,3 +1,7 @@
+## 5.2.0
+  - Added json_batch format
+  - Make 429 responses log at debug, not error level. They are really just flow control
+
 ## 5.1.2
   - Add check to avoid hanging pipeline if an empty event array is passed in. #80
 
