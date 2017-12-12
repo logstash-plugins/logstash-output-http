@@ -47,7 +47,7 @@ class TestApp < Sinatra::Base
   end
 
   def self.retry_fail_count()
-    @retry_fail_count
+    @retry_fail_count || 2
   end
 
   multiroute(%w(get post put patch delete), "/good") do
@@ -126,6 +126,7 @@ describe LogStash::Outputs::Http do
                          with(expected_method, url, anything).
                          and_call_original
       allow(subject).to receive(:log_failure).with(any_args)
+      allow(subject).to receive(:log_retryable_response).with(any_args)
     end
 
     context 'sending no events' do
@@ -190,8 +191,8 @@ describe LogStash::Outputs::Http do
           subject.multi_receive([event])
         end
 
-        it "should log a failure 2 times" do
-          expect(subject).to have_received(:log_failure).with(any_args).twice
+        it "should log a retryable response 2 times" do
+          expect(subject).to have_received(:log_retryable_response).with(any_args).twice
         end
 
         it "should make three total requests" do
@@ -213,24 +214,43 @@ describe LogStash::Outputs::Http do
       TestApp.last_request = nil
     end
 
-    before do
-      subject.multi_receive([event])
+    let(:events) { [event] }
+
+    describe "with a good code" do
+      before do
+        subject.multi_receive(events)
+      end
+
+      let(:last_request) { TestApp.last_request }
+      let(:body) { last_request.body.read }
+      let(:content_type) { last_request.env["CONTENT_TYPE"] }
+
+      it "should receive the request" do
+        expect(last_request).to be_truthy
+      end
+
+      it "should receive the event as a hash" do
+        expect(body).to eql(expected_body)
+      end
+
+      it "should have the correct content type" do
+        expect(content_type).to eql(expected_content_type)
+      end
     end
 
-    let(:last_request) { TestApp.last_request }
-    let(:body) { last_request.body.read }
-    let(:content_type) { last_request.env["CONTENT_TYPE"] }
+    describe "a retryable code" do
+      let(:url) { "http://localhost:#{port}/retry" }
 
-    it "should receive the request" do
-      expect(last_request).to be_truthy
-    end
+      before do
+        TestApp.retry_fail_count=2
+        allow(subject).to receive(:send_event).and_call_original
+        allow(subject).to receive(:log_retryable_response)
+        subject.multi_receive(events)
+      end
 
-    it "should receive the event as a hash" do
-      expect(body).to eql(expected_body)
-    end
-
-    it "should have the correct content type" do
-      expect(content_type).to eql(expected_content_type)
+      it "should retry" do
+        expect(subject).to have_received(:log_retryable_response).with(any_args).twice
+      end
     end
   end
 
@@ -255,6 +275,19 @@ describe LogStash::Outputs::Http do
       let(:expected_content_type) { "application/json" }
 
       include_examples("a received event")
+    end
+
+    describe "sending the batch as JSON" do
+      let(:config) do
+        base_config.merge({"url" => url, "http_method" => "post", "format" => "json_batch"})
+      end
+
+      let(:expected_body) { ::LogStash::Json.dump events }
+      let(:events) { [::LogStash::Event.new("a" => 1), ::LogStash::Event.new("b" => 2)]}
+      let(:expected_content_type) { "application/json" }
+      
+      include_examples("a received event")
+
     end
 
     describe "sending the event as a form" do

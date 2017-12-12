@@ -46,7 +46,7 @@ This plugin supports the following configuration options plus the <<plugins-{typ
 | <<plugins-{type}s-{plugin}-content_type>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-cookies>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-follow_redirects>> |<<boolean,boolean>>|No
-| <<plugins-{type}s-{plugin}-format>> |<<string,string>>, one of `["json", "form", "message"]`|No
+| <<plugins-{type}s-{plugin}-format>> |<<string,string>>, one of `["json", "json_batch", "form", "message"]`|No
 | <<plugins-{type}s-{plugin}-headers>> |<<hash,hash>>|No
 | <<plugins-{type}s-{plugin}-http_compression>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-http_method>> |<<string,string>>, one of `["put", "post", "patch", "delete", "get", "head"]`|Yes
@@ -130,6 +130,7 @@ Content type
 If not specified, this defaults to the following:
 
 * if format is "json", "application/json"
+* if format is "json_batch", "application/json". Each Logstash batch of events will be concatenated into a single array and sent in one request.
 * if format is "form", "application/x-www-form-urlencoded"
 
 [id="plugins-{type}s-{plugin}-cookies"]
@@ -152,7 +153,7 @@ Should redirects be followed? Defaults to `true`
 [id="plugins-{type}s-{plugin}-format"]
 ===== `format` 
 
-  * Value can be any of: `json`, `form`, `message`
+  * Value can be any of: `json`, `json_batch`, `form`, `message`
   * Default value is `"json"`
 
 Set the format of the http body.

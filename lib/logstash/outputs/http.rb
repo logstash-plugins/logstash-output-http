@@ -42,7 +42,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   # Custom headers to use
   # format is `headers => ["X-My-Header", "%{host}"]`
-  config :headers, :validate => :hash
+  config :headers, :validate => :hash, :default => {}
 
   # Content type
   #
@@ -79,7 +79,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # If message, then the body will be the result of formatting the event according to message
   #
   # Otherwise, the event is sent as json.
-  config :format, :validate => ["json", "form", "message"], :default => "json"
+  config :format, :validate => ["json", "json_batch", "form", "message"], :default => "json"
 
   # Set this to true if you want to enable gzip compression for your http requests
   config :http_compression, :validate => :boolean, :default => false
@@ -102,9 +102,13 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       case @format
         when "form" ; @content_type = "application/x-www-form-urlencoded"
         when "json" ; @content_type = "application/json"
+        when "json_batch" ; @content_type = "application/json"
         when "message" ; @content_type = "text/plain"
       end
     end
+
+
+    @headers["Content-Type"] = @content_type
 
     validate_format!
     
@@ -113,7 +117,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end # def register
 
   def multi_receive(events)
-    send_events(events) unless events.empty?
+    return if events.empty?
+    if @format == "json_batch"
+      send_json_batch(events)
+    else
+      send_events(events)
+    end
   end
   
   class RetryTimerTask < java.util.TimerTask
@@ -127,6 +136,46 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     def run
       @pending << [@event, @attempt]
     end
+  end
+
+  def send_json_batch(events)
+    attempt = 1
+    body = LogStash::Json.dump(events.map {|e| map_event(e) })
+    begin
+      while true
+        request = client.send(@http_method, @url, :body => body, :headers => @headers)
+        response = request.call
+        break if response_success?(response)
+        if retryable_response?(response)
+          log_retryable_response(response)
+          sleep_for_attempt attempt
+          attempt += 1
+        else
+          log_error_response(response, url, events)
+        end
+      end
+    rescue *RETRYABLE_MANTICORE_EXCEPTIONS => e
+      logger.warn("Encountered exception during http output send, will retry after delay",  :message => e.message, :class => e.class.name)
+      sleep_for_attempt attempt
+      retry
+    end
+  end
+
+  def log_retryable_response(response)
+    if (response.code == 429)
+      @logger.debug? && @logger.debug("Encountered a 429 response, will retry. This is not serious, just flow control via HTTP")
+    else
+      @logger.warn("Encountered a retryable HTTP request in HTTP output, will retry", :code => response.code, :body => response.body)
+    end
+  end
+
+  def log_error_response(response, url, event)
+    log_failure(
+              "Encountered non-2xx HTTP code #{response.code}",
+              :response_code => response.code,
+              :url => url,
+              :event => event
+            )
   end
   
   def send_events(events)
@@ -212,18 +261,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     request.on_success do |response|
       begin
         if !response_success?(response)
-          will_retry = retryable_response?(response)
-          log_failure(
-            "Encountered non-2xx HTTP code #{response.code}",
-            :response_code => response.code,
-            :url => url,
-            :event => event,
-            :will_retry => will_retry
-          )
-          
-          if will_retry 
+          if retryable_response?(response)
+            log_retryable_response(response)
             yield :retry, event, attempt
           else
+            log_error_response(response, url, event)
             yield :failure, event, attempt
           end
         else
@@ -343,9 +385,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   def event_headers(event)
-    headers = custom_headers(event) || {}
-    headers["Content-Type"] = @content_type
-    headers
+    custom_headers(event) || {}
   end
 
   def custom_headers(event)
