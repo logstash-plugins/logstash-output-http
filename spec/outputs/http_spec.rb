@@ -128,6 +128,12 @@ describe LogStash::Outputs::Http do
       allow(subject).to receive(:log_failure).with(any_args)
     end
 
+    context 'sending no events' do
+      it 'should not block the pipeline' do
+        subject.multi_receive([])
+      end
+    end
+
     context "performing a get" do
       describe "invoking the request" do
         before do

@@ -113,7 +113,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end # def register
 
   def multi_receive(events)
-    send_events(events)
+    send_events(events) unless events.empty?
   end
   
   class RetryTimerTask < java.util.TimerTask
@@ -136,7 +136,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     
     pending = Queue.new
     events.each {|e| pending << [e, 0]}
-    
+
     while popped = pending.pop
       break if popped == :done
       

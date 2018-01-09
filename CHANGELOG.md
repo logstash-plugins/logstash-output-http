@@ -1,3 +1,6 @@
+## 5.1.2
+  - Add check to avoid hanging pipeline if an empty event array is passed in. #80
+
 ## 5.1.1
   - Update gemspec summary
 
