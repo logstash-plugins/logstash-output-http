@@ -1,5 +1,6 @@
 :plugin: http
 :type: output
+:default_codec: plain
 
 ///////////////////////////////////////////
 START - GENERATED VARIABLES, DO NOT EDIT!
@@ -382,3 +383,5 @@ See https://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/org/apache
 
 [id="plugins-{type}s-{plugin}-common-options"]
 include::{include_path}/{type}.asciidoc[]
+
+:default_codec!:

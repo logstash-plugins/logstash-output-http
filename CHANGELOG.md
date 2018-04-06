@@ -1,3 +1,6 @@
+## 5.2.1
+  - Docs: Set the default_codec doc attribute.
+
 ## 5.2.0
   - Added json_batch format
   - Make 429 responses log at debug, not error level. They are really just flow control
