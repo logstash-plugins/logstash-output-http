@@ -110,6 +110,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     @headers["Content-Type"] = @content_type
 
+    # add appropriate header for gzip compression
+    if @http_compression == true
+      @headers["Content-Encoding"] = "gzip"
+    end
+
     validate_format!
     
     # Run named Timer as daemon thread
@@ -141,6 +146,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   def send_json_batch(events)
     attempt = 1
     body = LogStash::Json.dump(events.map {|e| map_event(e) })
+
+    if @http_compression == true
+      body = gzip(body)
+    end
+
     begin
       while true
         request = client.send(@http_method, @url, :body => body, :headers => @headers)
@@ -249,9 +259,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     url = event.sprintf(@url)
     headers = event_headers(event)
 
-    # Compress the body and add appropriate header
+    # Compress the body
     if @http_compression == true
-      headers["Content-Encoding"] = "gzip"
       body = gzip(body)
     end
 
