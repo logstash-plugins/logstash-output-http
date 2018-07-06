@@ -1,3 +1,6 @@
+## 5.2.2
+  - Fix high CPU usage on retries in json_batch mode.
+
 ## 5.2.1
   - Docs: Set the default_codec doc attribute.
 

@@ -118,46 +118,20 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   def multi_receive(events)
     return if events.empty?
-    if @format == "json_batch"
-      send_json_batch(events)
-    else
-      send_events(events)
-    end
+    send_events(events)
   end
   
   class RetryTimerTask < java.util.TimerTask
-    def initialize(pending, event, attempt)
+    def initialize(pending, event, attempt, is_batch)
       @pending = pending
       @event = event
       @attempt = attempt
+      @is_batch = is_batch
       super()
     end
     
     def run
-      @pending << [@event, @attempt]
-    end
-  end
-
-  def send_json_batch(events)
-    attempt = 1
-    body = LogStash::Json.dump(events.map {|e| map_event(e) })
-    begin
-      while true
-        request = client.send(@http_method, @url, :body => body, :headers => @headers)
-        response = request.call
-        break if response_success?(response)
-        if retryable_response?(response)
-          log_retryable_response(response)
-          sleep_for_attempt attempt
-          attempt += 1
-        else
-          log_error_response(response, url, events)
-        end
-      end
-    rescue *RETRYABLE_MANTICORE_EXCEPTIONS => e
-      logger.warn("Encountered exception during http output send, will retry after delay",  :message => e.message, :class => e.class.name)
-      sleep_for_attempt attempt
-      retry
+      @pending << [@event, @attempt, @is_batch]
     end
   end
 
@@ -182,16 +156,21 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     successes = java.util.concurrent.atomic.AtomicInteger.new(0)
     failures  = java.util.concurrent.atomic.AtomicInteger.new(0)
     retries = java.util.concurrent.atomic.AtomicInteger.new(0)
-    
+    event_count = @format == "json_batch" ? 1 : events.size
+
     pending = Queue.new
-    events.each {|e| pending << [e, 0]}
+    if @format == "json_batch"
+      pending << [events, 0, true]
+    else
+      events.each {|e| pending << [e, 0, false]}
+    end
 
     while popped = pending.pop
       break if popped == :done
       
-      event, attempt = popped
-      
-      send_event(event, attempt) do |action,event,attempt|
+      event, attempt, is_batch = popped
+
+      send_event(event, attempt, is_batch) do |action,event,attempt|
         begin 
           action = :failure if action == :retry && !@retry_failed
           
@@ -204,7 +183,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
             next_attempt = attempt+1
             sleep_for = sleep_for_attempt(next_attempt)
             @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
-            timer_task = RetryTimerTask.new(pending, event, next_attempt)
+            timer_task = RetryTimerTask.new(pending, event, next_attempt, is_batch)
             @timer.schedule(timer_task, sleep_for*1000)
           when :failure 
             failures.incrementAndGet
@@ -213,7 +192,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           end
           
           if action == :success || action == :failure 
-            if successes.get+failures.get == events.size
+            if successes.get+failures.get == event_count
               pending << :done
             end
           end
@@ -242,15 +221,15 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     (sleep_for/2) + (rand(0..sleep_for)/2)
   end
   
-  def send_event(event, attempt)
+  def send_event(event, attempt, is_batch)
     body = event_body(event)
 
     # Send the request
-    url = event.sprintf(@url)
-    headers = event_headers(event)
+    url = is_batch ? @url : event.sprintf(@url)
+    headers = is_batch ? @headers : event_headers(event)
 
     # Compress the body and add appropriate header
-    if @http_compression == true
+    if @http_compression == true && !is_batch
       headers["Content-Encoding"] = "gzip"
       body = gzip(body)
     end
@@ -347,6 +326,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       LogStash::Json.dump(map_event(event))
     elsif @format == "message"
       event.sprintf(@message)
+    elsif @format == "json_batch"
+      LogStash::Json.dump(event.map {|e| map_event(e) })
     else
       encode(map_event(event))
     end
