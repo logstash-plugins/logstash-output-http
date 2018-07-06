@@ -1,5 +1,6 @@
 ## 5.2.2
-  - Fix high CPU usage on retries in json_batch mode.
+  - Fix high CPU usage on retries in json_batch mode. [#89](https://github.com/logstash-plugins/logstash-output-http/pull/89)
+  - Enable compression in json_batch mode. [#89](https://github.com/logstash-plugins/logstash-output-http/pull/89)
 
 ## 5.2.1
   - Docs: Set the default_codec doc attribute.
