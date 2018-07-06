@@ -11,6 +11,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   
   concurrency :shared
 
+  attr_accessor :is_batch
+
   VALID_METHODS = ["put", "post", "patch", "delete", "get", "head"]
   
   RETRYABLE_MANTICORE_EXCEPTIONS = [
@@ -107,6 +109,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       end
     end
 
+    @is_batch = @format == "json_batch"
 
     @headers["Content-Type"] = @content_type
 
@@ -118,11 +121,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   def multi_receive(events)
     return if events.empty?
-    if @format == "json_batch"
-      send_json_batch(events)
-    else
-      send_events(events)
-    end
+    send_events(events)
   end
   
   class RetryTimerTask < java.util.TimerTask
@@ -135,29 +134,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     
     def run
       @pending << [@event, @attempt]
-    end
-  end
-
-  def send_json_batch(events)
-    attempt = 1
-    body = LogStash::Json.dump(events.map {|e| map_event(e) })
-    begin
-      while true
-        request = client.send(@http_method, @url, :body => body, :headers => @headers)
-        response = request.call
-        break if response_success?(response)
-        if retryable_response?(response)
-          log_retryable_response(response)
-          sleep_for_attempt attempt
-          attempt += 1
-        else
-          log_error_response(response, url, events)
-        end
-      end
-    rescue *RETRYABLE_MANTICORE_EXCEPTIONS => e
-      logger.warn("Encountered exception during http output send, will retry after delay",  :message => e.message, :class => e.class.name)
-      sleep_for_attempt attempt
-      retry
     end
   end
 
@@ -182,15 +158,20 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     successes = java.util.concurrent.atomic.AtomicInteger.new(0)
     failures  = java.util.concurrent.atomic.AtomicInteger.new(0)
     retries = java.util.concurrent.atomic.AtomicInteger.new(0)
-    
+    event_count = @is_batch ? 1 : events.size
+
     pending = Queue.new
-    events.each {|e| pending << [e, 0]}
+    if @is_batch
+      pending << [events, 0]
+    else
+      events.each {|e| pending << [e, 0]}
+    end
 
     while popped = pending.pop
       break if popped == :done
       
       event, attempt = popped
-      
+
       send_event(event, attempt) do |action,event,attempt|
         begin 
           action = :failure if action == :retry && !@retry_failed
@@ -213,7 +194,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           end
           
           if action == :success || action == :failure 
-            if successes.get+failures.get == events.size
+            if successes.get+failures.get == event_count
               pending << :done
             end
           end
@@ -246,8 +227,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     body = event_body(event)
 
     # Send the request
-    url = event.sprintf(@url)
-    headers = event_headers(event)
+    url = @is_batch ? @url : event.sprintf(@url)
+    headers = @is_batch ? @headers : event_headers(event)
 
     # Compress the body and add appropriate header
     if @http_compression == true
@@ -347,6 +328,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       LogStash::Json.dump(map_event(event))
     elsif @format == "message"
       event.sprintf(@message)
+    elsif @format == "json_batch"
+      LogStash::Json.dump(event.map {|e| map_event(e) })
     else
       encode(map_event(event))
     end
