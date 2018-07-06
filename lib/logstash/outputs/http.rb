@@ -231,7 +231,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     headers = @is_batch ? @headers : event_headers(event)
 
     # Compress the body and add appropriate header
-    if @http_compression == true && !@is_batch
+    if @http_compression == true
       headers["Content-Encoding"] = "gzip"
       body = gzip(body)
     end
