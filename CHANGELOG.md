@@ -1,3 +1,6 @@
+## 5.2.2
+  - Http compression for json_batch format.
+
 ## 5.2.1
   - Docs: Set the default_codec doc attribute.
 
