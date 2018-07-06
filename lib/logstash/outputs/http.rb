@@ -11,6 +11,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   
   concurrency :shared
 
+  attr_accessor :is_batch
+
   VALID_METHODS = ["put", "post", "patch", "delete", "get", "head"]
   
   RETRYABLE_MANTICORE_EXCEPTIONS = [
@@ -107,6 +109,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       end
     end
 
+    @is_batch = @format == "json_batch"
 
     @headers["Content-Type"] = @content_type
 
@@ -122,16 +125,15 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
   
   class RetryTimerTask < java.util.TimerTask
-    def initialize(pending, event, attempt, is_batch)
+    def initialize(pending, event, attempt)
       @pending = pending
       @event = event
       @attempt = attempt
-      @is_batch = is_batch
       super()
     end
     
     def run
-      @pending << [@event, @attempt, @is_batch]
+      @pending << [@event, @attempt]
     end
   end
 
@@ -156,21 +158,21 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     successes = java.util.concurrent.atomic.AtomicInteger.new(0)
     failures  = java.util.concurrent.atomic.AtomicInteger.new(0)
     retries = java.util.concurrent.atomic.AtomicInteger.new(0)
-    event_count = @format == "json_batch" ? 1 : events.size
+    event_count = @is_batch ? 1 : events.size
 
     pending = Queue.new
-    if @format == "json_batch"
-      pending << [events, 0, true]
+    if @is_batch
+      pending << [events, 0]
     else
-      events.each {|e| pending << [e, 0, false]}
+      events.each {|e| pending << [e, 0]}
     end
 
     while popped = pending.pop
       break if popped == :done
       
-      event, attempt, is_batch = popped
+      event, attempt = popped
 
-      send_event(event, attempt, is_batch) do |action,event,attempt|
+      send_event(event, attempt) do |action,event,attempt|
         begin 
           action = :failure if action == :retry && !@retry_failed
           
@@ -183,7 +185,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
             next_attempt = attempt+1
             sleep_for = sleep_for_attempt(next_attempt)
             @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
-            timer_task = RetryTimerTask.new(pending, event, next_attempt, is_batch)
+            timer_task = RetryTimerTask.new(pending, event, next_attempt)
             @timer.schedule(timer_task, sleep_for*1000)
           when :failure 
             failures.incrementAndGet
@@ -221,15 +223,15 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     (sleep_for/2) + (rand(0..sleep_for)/2)
   end
   
-  def send_event(event, attempt, is_batch)
+  def send_event(event, attempt)
     body = event_body(event)
 
     # Send the request
-    url = is_batch ? @url : event.sprintf(@url)
-    headers = is_batch ? @headers : event_headers(event)
+    url = @is_batch ? @url : event.sprintf(@url)
+    headers = @is_batch ? @headers : event_headers(event)
 
     # Compress the body and add appropriate header
-    if @http_compression == true && !is_batch
+    if @http_compression == true && !@is_batch
       headers["Content-Encoding"] = "gzip"
       body = gzip(body)
     end
