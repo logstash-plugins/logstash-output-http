@@ -8,18 +8,18 @@ require "zlib"
 
 class LogStash::Outputs::Http < LogStash::Outputs::Base
   include LogStash::PluginMixins::HttpClient
-  
+
   concurrency :shared
 
   attr_accessor :is_batch
 
   VALID_METHODS = ["put", "post", "patch", "delete", "get", "head"]
-  
+
   RETRYABLE_MANTICORE_EXCEPTIONS = [
     ::Manticore::Timeout,
     ::Manticore::SocketException,
-    ::Manticore::ClientProtocolException, 
-    ::Manticore::ResolutionFailure, 
+    ::Manticore::ClientProtocolException,
+    ::Manticore::ResolutionFailure,
     ::Manticore::SocketTimeout
   ]
 
@@ -53,14 +53,14 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # * if format is "json", "application/json"
   # * if format is "form", "application/x-www-form-urlencoded"
   config :content_type, :validate => :string
-  
+
   # Set this to false if you don't want this output to retry failed requests
   config :retry_failed, :validate => :boolean, :default => true
-  
+
   # If encountered as response codes this plugin will retry these requests
   config :retryable_codes, :validate => :number, :list => true, :default => [429, 500, 502, 503, 504]
-  
-  # If you would like to consider some non-2xx codes to be successes 
+
+  # If you would like to consider some non-2xx codes to be successes
   # enumerate them here. Responses returning these codes will be considered successes
   config :ignorable_codes, :validate => :number, :list => true
 
@@ -85,7 +85,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   # Set this to true if you want to enable gzip compression for your http requests
   config :http_compression, :validate => :boolean, :default => false
-  
+
   config :message, :validate => :string
 
   def register
@@ -114,7 +114,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     @headers["Content-Type"] = @content_type
 
     validate_format!
-    
+
     # Run named Timer as daemon thread
     @timer = java.util.Timer.new("HTTP Output #{self.params['id']}", true)
   end # def register
@@ -123,7 +123,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     return if events.empty?
     send_events(events)
   end
-  
+
   class RetryTimerTask < java.util.TimerTask
     def initialize(pending, event, attempt)
       @pending = pending
@@ -131,7 +131,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       @attempt = attempt
       super()
     end
-    
+
     def run
       @pending << [@event, @attempt]
     end
@@ -153,7 +153,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
               :event => event
             )
   end
-  
+
   def send_events(events)
     successes = java.util.concurrent.atomic.AtomicInteger.new(0)
     failures  = java.util.concurrent.atomic.AtomicInteger.new(0)
@@ -169,36 +169,36 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     while popped = pending.pop
       break if popped == :done
-      
+
       event, attempt = popped
 
       send_event(event, attempt) do |action,event,attempt|
-        begin 
+        begin
           action = :failure if action == :retry && !@retry_failed
-          
+
           case action
           when :success
             successes.incrementAndGet
           when :retry
             retries.incrementAndGet
-            
+
             next_attempt = attempt+1
             sleep_for = sleep_for_attempt(next_attempt)
             @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
             timer_task = RetryTimerTask.new(pending, event, next_attempt)
             @timer.schedule(timer_task, sleep_for*1000)
-          when :failure 
+          when :failure
             failures.incrementAndGet
           else
             raise "Unknown action #{action}"
           end
-          
-          if action == :success || action == :failure 
+
+          if action == :success || action == :failure
             if successes.get+failures.get == event_count
               pending << :done
             end
           end
-        rescue => e 
+        rescue => e
           # This should never happen unless there's a flat out bug in the code
           @logger.error("Error sending HTTP Request",
             :class => e.class.name,
@@ -216,13 +216,13 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
             :backtrace => e.backtrace)
     raise e
   end
-  
+
   def sleep_for_attempt(attempt)
     sleep_for = attempt**2
     sleep_for = sleep_for <= 60 ? sleep_for : 60
     (sleep_for/2) + (rand(0..sleep_for)/2)
   end
-  
+
   def send_event(event, attempt)
     body = event_body(event)
 
@@ -252,7 +252,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         else
           yield :success, event, attempt
         end
-      rescue => e 
+      rescue => e
         # Shouldn't ever happen
         @logger.error("Unexpected error in request success!",
           :class => e.class.name,
@@ -262,7 +262,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     end
 
     request.on_failure do |exception|
-      begin 
+      begin
         will_retry = retryable_exception?(exception)
         log_failure("Could not fetch URL",
                     :url => url,
@@ -274,13 +274,13 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
                     :backtrace => exception.backtrace,
                     :will_retry => will_retry
         )
-        
+
         if will_retry
           yield :retry, event, attempt
         else
           yield :failure, event, attempt
         end
-      rescue => e 
+      rescue => e
         # Shouldn't ever happen
         @logger.error("Unexpected error in request failure!",
           :class => e.class.name,
@@ -292,7 +292,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     # Actually invoke the request in the background
     # Note: this must only be invoked after all handlers are defined, otherwise
     # those handlers are not guaranteed to be called!
-    request.call 
+    request.call
   end
 
   def close
@@ -301,17 +301,17 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   private
-  
+
   def response_success?(response)
     code = response.code
     return true if @ignorable_codes && @ignorable_codes.include?(code)
     return code >= 200 && code <= 299
   end
-  
+
   def retryable_response?(response)
     @retryable_codes.include?(response.code)
   end
-  
+
   def retryable_exception?(exception)
     RETRYABLE_MANTICORE_EXCEPTIONS.any? {|me| exception.is_a?(me) }
   end
