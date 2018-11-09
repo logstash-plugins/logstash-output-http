@@ -172,41 +172,40 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
       event, attempt = popped
 
-      send_event(event, attempt) do |action,event,attempt|
-        begin
-          action = :failure if action == :retry && !@retry_failed
+      action, event, attempt = send_event(event, attempt)
+      begin
+        action = :failure if action == :retry && !@retry_failed
 
-          case action
-          when :success
-            successes.incrementAndGet
-          when :retry
-            retries.incrementAndGet
+        case action
+        when :success
+          successes.incrementAndGet
+        when :retry
+          retries.incrementAndGet
 
-            next_attempt = attempt+1
-            sleep_for = sleep_for_attempt(next_attempt)
-            @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
-            timer_task = RetryTimerTask.new(pending, event, next_attempt)
-            @timer.schedule(timer_task, sleep_for*1000)
-          when :failure
-            failures.incrementAndGet
-          else
-            raise "Unknown action #{action}"
-          end
-
-          if action == :success || action == :failure
-            if successes.get+failures.get == event_count
-              pending << :done
-            end
-          end
-        rescue => e
-          # This should never happen unless there's a flat out bug in the code
-          @logger.error("Error sending HTTP Request",
-            :class => e.class.name,
-            :message => e.message,
-            :backtrace => e.backtrace)
+          next_attempt = attempt+1
+          sleep_for = sleep_for_attempt(next_attempt)
+          @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
+          timer_task = RetryTimerTask.new(pending, event, next_attempt)
+          @timer.schedule(timer_task, sleep_for*1000)
+        when :failure
           failures.incrementAndGet
-          raise e
+        else
+          raise "Unknown action #{action}"
         end
+
+        if action == :success || action == :failure
+          if successes.get+failures.get == event_count
+            pending << :done
+          end
+        end
+      rescue => e
+        # This should never happen unless there's a flat out bug in the code
+        @logger.error("Error sending HTTP Request",
+          :class => e.class.name,
+          :message => e.message,
+          :backtrace => e.backtrace)
+        failures.incrementAndGet
+        raise e
       end
     end
   rescue => e
@@ -237,62 +236,38 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     end
 
     # Create an async request
-    request = client.background.send(@http_method, url, :body => body, :headers => headers)
+    response = client.send(@http_method, url, :body => body, :headers => headers).call
 
-    request.on_success do |response|
-      begin
-        if !response_success?(response)
-          if retryable_response?(response)
-            log_retryable_response(response)
-            yield :retry, event, attempt
-          else
-            log_error_response(response, url, event)
-            yield :failure, event, attempt
-          end
-        else
-          yield :success, event, attempt
-        end
-      rescue => e
-        # Shouldn't ever happen
-        @logger.error("Unexpected error in request success!",
-          :class => e.class.name,
-          :message => e.message,
-          :backtrace => e.backtrace)
+    if !response_success?(response)
+      if retryable_response?(response)
+        log_retryable_response(response)
+        return :retry, event, attempt
+      else
+        log_error_response(response, url, event)
+        return :failure, event, attempt
       end
+    else
+      return :success, event, attempt
     end
 
-    request.on_failure do |exception|
-      begin
-        will_retry = retryable_exception?(exception)
-        log_failure("Could not fetch URL",
-                    :url => url,
-                    :method => @http_method,
-                    :body => body,
-                    :headers => headers,
-                    :message => exception.message,
-                    :class => exception.class.name,
-                    :backtrace => exception.backtrace,
-                    :will_retry => will_retry
-        )
+  rescue => exception
+    will_retry = retryable_exception?(exception)
+    log_failure("Could not fetch URL",
+                :url => url,
+                :method => @http_method,
+                :body => body,
+                :headers => headers,
+                :message => exception.message,
+                :class => exception.class.name,
+                :backtrace => exception.backtrace,
+                :will_retry => will_retry
+    )
 
-        if will_retry
-          yield :retry, event, attempt
-        else
-          yield :failure, event, attempt
-        end
-      rescue => e
-        # Shouldn't ever happen
-        @logger.error("Unexpected error in request failure!",
-          :class => e.class.name,
-          :message => e.message,
-          :backtrace => e.backtrace)
-        end
+    if will_retry
+      return :retry, event, attempt
+    else
+      return :failure, event, attempt
     end
-
-    # Actually invoke the request in the background
-    # Note: this must only be invoked after all handlers are defined, otherwise
-    # those handlers are not guaranteed to be called!
-    request.call
   end
 
   def close
