@@ -117,12 +117,10 @@ describe LogStash::Outputs::Http do
 
     let(:expected_method) { method.clone.to_sym }
     let(:client) { subject.client }
-    let(:client_proxy) { subject.client.background }
 
     before do
-      allow(client).to receive(:background).and_return(client_proxy)
       subject.register
-      allow(client_proxy).to receive(:send).
+      allow(client).to receive(:send).
                          with(expected_method, url, anything).
                          and_call_original
       allow(subject).to receive(:log_failure).with(any_args)
@@ -142,7 +140,7 @@ describe LogStash::Outputs::Http do
         end
 
         it "should execute the request" do
-          expect(client_proxy).to have_received(:send).
+          expect(client).to have_received(:send).
                               with(expected_method, url, anything)
         end
       end
