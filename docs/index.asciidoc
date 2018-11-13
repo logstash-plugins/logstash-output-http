@@ -102,7 +102,7 @@ If you need to use a custom X.509 CA (.pem certs) specify the path to that here
   * Value type is <<path,path>>
   * There is no default value for this setting.
 
-If you'd like to use a client certificate (note, most people don't want this) set the path to the x509 cert here
+If you'd like to use a client certificate (note, most people don't want this) set the path to the x509 cert here.
 
 [id="plugins-{type}s-{plugin}-client_key"]
 ===== `client_key` 
@@ -110,7 +110,7 @@ If you'd like to use a client certificate (note, most people don't want this) se
   * Value type is <<path,path>>
   * There is no default value for this setting.
 
-If you're using a client certificate specify the path to the encryption key here
+If you're using a client certificate specify the path to the encryption key here. It has to be in pkcs8 format and may not have a password.
 
 [id="plugins-{type}s-{plugin}-connect_timeout"]
 ===== `connect_timeout` 
