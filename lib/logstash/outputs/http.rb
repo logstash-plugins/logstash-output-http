@@ -284,7 +284,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   def retryable_response?(response)
-    @retryable_codes.include?(response.code)
+    @retryable_codes && @retryable_codes.include?(response.code)
   end
 
   def retryable_exception?(exception)
