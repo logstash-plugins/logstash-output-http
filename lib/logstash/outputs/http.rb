@@ -8,18 +8,18 @@ require "zlib"
 
 class LogStash::Outputs::Http < LogStash::Outputs::Base
   include LogStash::PluginMixins::HttpClient
-  
+
   concurrency :shared
 
   attr_accessor :is_batch
 
   VALID_METHODS = ["put", "post", "patch", "delete", "get", "head"]
-  
+
   RETRYABLE_MANTICORE_EXCEPTIONS = [
     ::Manticore::Timeout,
     ::Manticore::SocketException,
-    ::Manticore::ClientProtocolException, 
-    ::Manticore::ResolutionFailure, 
+    ::Manticore::ClientProtocolException,
+    ::Manticore::ResolutionFailure,
     ::Manticore::SocketTimeout
   ]
 
@@ -53,14 +53,14 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # * if format is "json", "application/json"
   # * if format is "form", "application/x-www-form-urlencoded"
   config :content_type, :validate => :string
-  
+
   # Set this to false if you don't want this output to retry failed requests
   config :retry_failed, :validate => :boolean, :default => true
-  
+
   # If encountered as response codes this plugin will retry these requests
   config :retryable_codes, :validate => :number, :list => true, :default => [429, 500, 502, 503, 504]
-  
-  # If you would like to consider some non-2xx codes to be successes 
+
+  # If you would like to consider some non-2xx codes to be successes
   # enumerate them here. Responses returning these codes will be considered successes
   config :ignorable_codes, :validate => :number, :list => true
 
@@ -85,7 +85,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   # Set this to true if you want to enable gzip compression for your http requests
   config :http_compression, :validate => :boolean, :default => false
-  
+
   config :message, :validate => :string
 
   def register
@@ -114,7 +114,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     @headers["Content-Type"] = @content_type
 
     validate_format!
-    
+
     # Run named Timer as daemon thread
     @timer = java.util.Timer.new("HTTP Output #{self.params['id']}", true)
   end # def register
@@ -123,7 +123,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     return if events.empty?
     send_events(events)
   end
-  
+
   class RetryTimerTask < java.util.TimerTask
     def initialize(pending, event, attempt)
       @pending = pending
@@ -131,7 +131,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       @attempt = attempt
       super()
     end
-    
+
     def run
       @pending << [@event, @attempt]
     end
@@ -153,7 +153,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
               :event => event
             )
   end
-  
+
   def send_events(events)
     successes = java.util.concurrent.atomic.AtomicInteger.new(0)
     failures  = java.util.concurrent.atomic.AtomicInteger.new(0)
@@ -169,7 +169,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     while popped = pending.pop
       break if popped == :done
-      
+
       event, attempt = popped
 
       action, event, attempt = send_event(event, attempt)
@@ -215,13 +215,13 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
             :backtrace => e.backtrace)
     raise e
   end
-  
+
   def sleep_for_attempt(attempt)
     sleep_for = attempt**2
     sleep_for = sleep_for <= 60 ? sleep_for : 60
     (sleep_for/2) + (rand(0..sleep_for)/2)
   end
-  
+
   def send_event(event, attempt)
     body = event_body(event)
 
@@ -276,17 +276,17 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   private
-  
+
   def response_success?(response)
     code = response.code
     return true if @ignorable_codes && @ignorable_codes.include?(code)
     return code >= 200 && code <= 299
   end
-  
+
   def retryable_response?(response)
     @retryable_codes.include?(response.code)
   end
-  
+
   def retryable_exception?(exception)
     RETRYABLE_MANTICORE_EXCEPTIONS.any? {|me| exception.is_a?(me) }
   end
