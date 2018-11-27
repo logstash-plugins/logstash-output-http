@@ -1,3 +1,6 @@
+## 5.2.3
+  - Fixed handling of empty `retryable_codes` [#99](https://github.com/logstash-plugins/logstash-output-http/pull/99)
+
 ## 5.2.2
   - Fix high CPU usage on retries in json_batch mode. [#89](https://github.com/logstash-plugins/logstash-output-http/pull/89)
   - Enable compression in json_batch mode. [#89](https://github.com/logstash-plugins/logstash-output-http/pull/89)

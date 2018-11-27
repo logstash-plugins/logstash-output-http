@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name            = 'logstash-output-http'
-  s.version         = '5.2.2'
+  s.version         = '5.2.3'
   s.licenses        = ['Apache License (2.0)']
   s.summary         = "Sends events to a generic HTTP or HTTPS endpoint"
   s.description     = "This gem is a Logstash plugin required to be installed on top of the Logstash core pipeline using $LS_HOME/bin/logstash-plugin install gemname. This gem is not a stand-alone program"
