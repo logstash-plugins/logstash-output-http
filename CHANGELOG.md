@@ -1,3 +1,6 @@
+## 5.2.4
+  - Relax dependency on http_client mixin since current major works on both
+
 ## 5.2.3
   - Fixed handling of empty `retryable_codes` [#99](https://github.com/logstash-plugins/logstash-output-http/pull/99)
 
