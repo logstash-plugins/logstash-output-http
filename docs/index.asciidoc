@@ -86,7 +86,7 @@ output plugins.
 
 How many times should the client retry a failing URL. We highly recommend NOT setting this value
 to zero if keepalive is enabled. Some servers incorrectly end keepalives early requiring a retry!
-Note: if `retry_non_idempotent` is set only GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
+Note: if `retry_non_idempotent` is NOT set only GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
 
 [id="plugins-{type}s-{plugin}-cacert"]
 ===== `cacert` 
