@@ -1,18 +1,4 @@
----
-sudo: required
-services: docker
-addons:
-  apt:
-    packages:
-    - docker-ce
-matrix:
-  include:
-  - env: SNAPSHOT=true ELASTIC_STACK_VERSION=8.x
-  - env: SNAPSHOT=true ELASTIC_STACK_VERSION=7.x
-  - env: ELASTIC_STACK_VERSION=7.x
-  - env: SNAPSHOT=true ELASTIC_STACK_VERSION=6.x
-  - env: ELASTIC_STACK_VERSION=6.x
-  - env: ELASTIC_STACK_VERSION=5.x
-  fast_finish: true
-install: ci/unit/docker-setup.sh
-script: ci/unit/docker-run.sh
+import:
+- logstash-plugins/.ci:travis/defaults.yml@travis_refactor
+- logstash-plugins/.ci:travis/matrix.yml@travis_refactor
+- logstash-plugins/.ci:travis/exec.yml@travis_refactor
