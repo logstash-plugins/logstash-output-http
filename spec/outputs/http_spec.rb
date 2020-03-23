@@ -57,6 +57,11 @@ class TestApp < Sinatra::Base
 
   multiroute(%w(get post put patch delete), "/bad") do
     self.class.last_request = request
+    [415, "YUP"]
+  end
+
+  multiroute(%w(get post put patch delete), "/dlq_bad") do
+    self.class.last_request = request
     [400, "YUP"]
   end
 
@@ -117,14 +122,23 @@ describe LogStash::Outputs::Http do
 
     let(:expected_method) { method.clone.to_sym }
     let(:client) { subject.client }
+    let(:dlq_enabled) { false }
+    let(:dlq_writer) { double("dlq_writer") }
+    let(:execution_context) { double("execution_context") }
 
     before do
+      allow(subject).to receive(:dlq_enabled?).with(any_args).and_return(dlq_enabled)
+      allow(subject).to receive(:execution_context).with(any_args).and_return(execution_context)
+      allow(execution_context).to receive(:dlq_writer).with(any_args).and_return(dlq_writer)
+      allow(dlq_writer).to receive(:write).with(any_args)
+
       subject.register
       allow(client).to receive(:send).
                          with(expected_method, url, anything).
                          and_call_original
       allow(subject).to receive(:log_failure).with(any_args)
       allow(subject).to receive(:log_retryable_response).with(any_args)
+      allow(subject).to receive(:write_to_dlq).with(any_args).and_call_original
     end
 
     context 'sending no events' do
@@ -165,18 +179,57 @@ describe LogStash::Outputs::Http do
         it "should log a failure" do
           expect(subject).to have_received(:log_failure).with(any_args)
         end
+        
+        it "should not be sent to dlq" do
+          expect(subject).not_to have_received(:write_to_dlq).with(any_args)
+        end
       end
 
       context "with ignorable failing requests" do
         let(:url) { "http://localhost:#{port}/bad"}
-        let(:verb_behavior_config) { super.merge("ignorable_codes" => [400]) }
+        let(:verb_behavior_config) { super.merge("ignorable_codes" => [415]) }
 
         before do
           subject.multi_receive([event])
         end
 
-        it "should log a failure" do
+        it "should not log a failure" do
           expect(subject).not_to have_received(:log_failure).with(any_args)
+        end
+
+        it "should not be sent to dlq" do
+          expect(subject).not_to have_received(:write_to_dlq).with(any_args)
+        end
+      end
+
+      context "with DLQ qualified failing requests" do
+        let(:url) { "http://localhost:#{port}/dlq_bad"}
+        let(:dlq_enabled) { true }
+        let(:verb_behavior_config) { super.merge("dlq_retryable_codes" => [400]) }
+
+        before do
+          subject.multi_receive([event])
+        end
+
+        it "should write to dlq" do
+          expect(subject).to have_received(:write_to_dlq).with(any_args)
+        end
+
+        it "should not log a failure" do 
+          expect(subject).not_to have_received(:log_failure).with(any_args)
+        end
+      end
+
+      context "when DLQ is not enabled" do 
+        let(:url) { "http://localhost:#{port}/dlq_bad"}
+        let(:verb_behavior_config) { super.merge("dlq_retryable_codes" => [400]) }
+
+        before do 
+          subject.multi_receive([event])
+        end
+
+        it "should not send the event to the DLQ instead, instead log" do
+          expect(subject).to have_received(:log_failure).with(any_args)
         end
       end
 

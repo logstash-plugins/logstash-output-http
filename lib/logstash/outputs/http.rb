@@ -60,6 +60,9 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # If encountered as response codes this plugin will retry these requests
   config :retryable_codes, :validate => :number, :list => true, :default => [429, 500, 502, 503, 504]
 
+  # If encountered as response codes, this plugin will write these events to DLQ
+  config :dlq_retryable_codes, :validate => :number, :list => true, :default => [400, 403, 404, 401]
+
   # If you would like to consider some non-2xx codes to be successes
   # enumerate them here. Responses returning these codes will be considered successes
   config :ignorable_codes, :validate => :number, :list => true
@@ -97,7 +100,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     # tokens must be added back by the client on success
     @request_tokens = SizedQueue.new(@pool_max)
     @pool_max.times {|t| @request_tokens << true }
-
+    @dlq_writer = dlq_enabled? ? execution_context.dlq_writer : nil
     @requests = Array.new
 
     if @content_type.nil?
@@ -152,6 +155,15 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
               :url => url,
               :event => event
             )
+  end
+
+  def write_to_dlq(url, event, response)
+    # To support bwc, we check if DLQ exists. otherwise we log and drop event (previous behavior)
+    if @dlq_writer
+      @dlq_writer.write(event, "Sending #{response.code} erred HTTP request to DLQ, url: #{url}, response: #{response}")
+    else
+      log_error_response(response, url, event)
+    end
   end
 
   def send_events(events)
@@ -242,6 +254,9 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       if retryable_response?(response)
         log_retryable_response(response)
         return :retry, event, attempt
+      elsif dlq_retryable_response?(response)
+        write_to_dlq(url, event, response)
+        return :failure, event, attempt
       else
         log_error_response(response, url, event)
         return :failure, event, attempt
@@ -285,6 +300,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   def retryable_response?(response)
     @retryable_codes && @retryable_codes.include?(response.code)
+  end
+
+  def dlq_retryable_response?(response)
+    @dlq_retryable_codes && @dlq_retryable_codes.include?(response.code)
   end
 
   def retryable_exception?(exception)
@@ -379,4 +398,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       end
     end
   end
+
+  def dlq_enabled?
+      # this is the only way to determine if current logstash is supporting a dlq and dlq is also enabled 
+      # Reference: https://github.com/elastic/logstash/issues/8064
+      respond_to?(:execution_context) && execution_context.respond_to?(:dlq_writer) &&
+        !execution_context.dlq_writer.inner_writer.is_a?(::LogStash::Util::DummyDeadLetterQueueWriter)
+    end
 end
