@@ -81,7 +81,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # If message, then the body will be the result of formatting the event according to message
   #
   # Otherwise, the event is sent as json.
-  config :format, :validate => ["json", "json_batch", "form", "message"], :default => "json"
+  config :format, :validate => ["json", "json_batch", "json_lines", "form", "message"], :default => "json"
+
+  # Set this to true if you want format url with batch body. Formating url is done by first element in batch
+  config :batch_url_format, :validate => :boolean, :default => false
 
   # Set this to true if you want to enable gzip compression for your http requests
   config :http_compression, :validate => :boolean, :default => false
@@ -105,11 +108,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         when "form" ; @content_type = "application/x-www-form-urlencoded"
         when "json" ; @content_type = "application/json"
         when "json_batch" ; @content_type = "application/json"
+        when "json_lines"; @content_type = "application/json_lines"
         when "message" ; @content_type = "text/plain"
       end
     end
 
-    @is_batch = @format == "json_batch"
+    @is_batch = @format == "json_batch" || @format == "json_lines"
 
     @headers["Content-Type"] = @content_type
 
@@ -226,7 +230,14 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     body = event_body(event)
 
     # Send the request
-    url = @is_batch ? @url : event.sprintf(@url)
+
+    # Format url
+    if @is_batch
+        url = @batch_url_format ? event[0].sprintf(@url) : @url
+    else
+        url = event.sprintf(@url)
+    end
+
     headers = @is_batch ? @headers : event_headers(event)
 
     # Compress the body and add appropriate header
@@ -305,6 +316,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       event.sprintf(@message)
     elsif @format == "json_batch"
       LogStash::Json.dump(event.map {|e| map_event(e) })
+    elsif @format == "json_lines"
+      (event.map { |e| LogStash::Json.dump(map_event(e)) }).join("\n")
     else
       encode(map_event(event))
     end
