@@ -81,14 +81,20 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # If message, then the body will be the result of formatting the event according to message
   #
   # Otherwise, the event is sent as json.
-  config :format, :validate => ["json", "json_batch", "form", "message"], :default => "json"
+  config :format, :validate => ["json", "json_batch", "form", "message", "codec"], :default => "json"
 
   # Set this to true if you want to enable gzip compression for your http requests
   config :http_compression, :validate => :boolean, :default => false
 
   config :message, :validate => :string
 
+  default :codec, :validate => :string, :default => "json"
+
   def register
+    @codec.on_event do |event, payload|
+      payload
+    end
+
     @http_method = @http_method.to_sym
 
     # We count outstanding requests with this queue
@@ -106,6 +112,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         when "json" ; @content_type = "application/json"
         when "json_batch" ; @content_type = "application/json"
         when "message" ; @content_type = "text/plain"
+        when "codec" ; @content_type = "text/plain"
       end
     end
 
@@ -298,11 +305,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   # Format the HTTP body
   def event_body(event)
-    # TODO: Create an HTTP post data codec, use that here
     if @format == "json"
       LogStash::Json.dump(map_event(event))
     elsif @format == "message"
       event.sprintf(@message)
+    elsif @format == "codec"
+      @codec.encode(event)
     elsif @format == "json_batch"
       LogStash::Json.dump(event.map {|e| map_event(e) })
     else
