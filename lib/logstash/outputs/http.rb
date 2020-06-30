@@ -160,6 +160,16 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # To support bwc, we check if DLQ exists. otherwise we log and drop event (previous behavior)
   def write_to_dlq(url, event, response)
     if @dlq_writer
+      log_failure(
+              "Sending this non-2xx HTTP code #{response.code} to DLQ",
+              :response_code => response.code,
+              :url => url,
+              :event => event
+            )
+      metadata = event.get("@metadata")
+      metadata.each_pair do |key, value| 
+        event.set("[custom_metadata][#{key}]", value)
+      end
       @dlq_writer.write(event, "Sending #{response.code} erred HTTP request to DLQ, url: #{url}, response: #{response}")
     else
       log_error_response(response, url, event)

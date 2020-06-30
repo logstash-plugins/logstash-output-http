@@ -136,7 +136,7 @@ describe LogStash::Outputs::Http do
       allow(client).to receive(:send).
                          with(expected_method, url, anything).
                          and_call_original
-      allow(subject).to receive(:log_failure).with(any_args)
+      allow(subject).to receive(:log_error_response).with(any_args)
       allow(subject).to receive(:log_retryable_response).with(any_args)
       allow(subject).to receive(:write_to_dlq).with(any_args).and_call_original
     end
@@ -165,7 +165,7 @@ describe LogStash::Outputs::Http do
         end
 
         it "should not log a failure" do
-          expect(subject).not_to have_received(:log_failure).with(any_args)
+          expect(subject).not_to have_received(:log_error_response).with(any_args)
         end
       end
 
@@ -177,7 +177,7 @@ describe LogStash::Outputs::Http do
         end
 
         it "should log a failure" do
-          expect(subject).to have_received(:log_failure).with(any_args)
+          expect(subject).to have_received(:log_error_response).with(any_args)
         end
         
         it "should not be sent to dlq" do
@@ -194,7 +194,7 @@ describe LogStash::Outputs::Http do
         end
 
         it "should not log a failure" do
-          expect(subject).not_to have_received(:log_failure).with(any_args)
+          expect(subject).not_to have_received(:log_error_response).with(any_args)
         end
 
         it "should not be sent to dlq" do
@@ -216,7 +216,7 @@ describe LogStash::Outputs::Http do
         end
 
         it "should not log a failure" do 
-          expect(subject).not_to have_received(:log_failure).with(any_args)
+          expect(subject).not_to have_received(:log_error_response).with(any_args)
         end
       end
 
@@ -229,7 +229,7 @@ describe LogStash::Outputs::Http do
         end
 
         it "should not send the event to the DLQ instead, instead log" do
-          expect(subject).to have_received(:log_failure).with(any_args)
+          expect(subject).to have_received(:log_error_response).with(any_args)
         end
       end
 
@@ -264,7 +264,7 @@ describe LogStash::Outputs::Http do
     before do
       TestApp.last_request = nil
     end
-
+    
     let(:events) { [event] }
 
     describe "with a good code" do
