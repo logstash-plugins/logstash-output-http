@@ -86,6 +86,9 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # Set this to true if you want to enable gzip compression for your http requests
   config :http_compression, :validate => :boolean, :default => false
 
+  # Set this to false to stop HTTP payloads from being added to error logs
+  config :log_http_payload, :validate => :boolean, :default => true
+
   config :message, :validate => :string
 
   def register
@@ -141,7 +144,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     if (response.code == 429)
       @logger.debug? && @logger.debug("Encountered a 429 response, will retry. This is not serious, just flow control via HTTP")
     else
-      @logger.warn("Encountered a retryable HTTP request in HTTP output, will retry", :code => response.code, :body => response.body)
+      @logger.warn("Encountered a retryable HTTP request in HTTP output, will retry", :code => response.code, :body => log_http_payload ? response.body : "[hidden]")
     end
   end
 
@@ -255,7 +258,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     log_failure("Could not fetch URL",
                 :url => url,
                 :method => @http_method,
-                :body => body,
+                :body => log_http_payload ? body : "[hidden]",
                 :headers => headers,
                 :message => exception.message,
                 :class => exception.class.name,

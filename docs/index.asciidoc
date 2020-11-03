@@ -56,6 +56,7 @@ This plugin supports the following configuration options plus the <<plugins-{typ
 | <<plugins-{type}s-{plugin}-keystore>> |a valid filesystem path|No
 | <<plugins-{type}s-{plugin}-keystore_password>> |<<password,password>>|No
 | <<plugins-{type}s-{plugin}-keystore_type>> |<<string,string>>|No
+| <<plugins-{type}s-{plugin}-log_http_payload>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-mapping>> |<<hash,hash>>|No
 | <<plugins-{type}s-{plugin}-message>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-pool_max>> |<<number,number>>|No
@@ -242,6 +243,14 @@ Note, most .jks files created with keytool require a password!
   * Default value is `"JKS"`
 
 Specify the keystore type here. One of `JKS` or `PKCS12`. Default is `JKS`
+
+[id="plugins-{type}s-{plugin}-log_http_payload"]
+===== `log_http_payload`
+
+  * Value type is <<boolean,boolean>>
+  * Default value is `true`
+  
+Turn this off to avoid printing HTTP payloads into error logs.
 
 [id="plugins-{type}s-{plugin}-mapping"]
 ===== `mapping` 
