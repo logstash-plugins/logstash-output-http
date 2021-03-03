@@ -169,7 +169,7 @@ describe LogStash::Outputs::Http do
 
       context "with ignorable failing requests" do
         let(:url) { "http://localhost:#{port}/bad"}
-        let(:verb_behavior_config) { super.merge("ignorable_codes" => [400]) }
+        let(:verb_behavior_config) { super().merge("ignorable_codes" => [400]) }
 
         before do
           subject.multi_receive([event])
