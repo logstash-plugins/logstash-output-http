@@ -1,3 +1,6 @@
+## 5.2.5
+  - Add support for logstash codecs
+
 ## 5.2.4
   - Relax dependency on http_client mixin since current major works on both
 
