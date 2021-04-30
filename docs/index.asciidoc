@@ -86,6 +86,8 @@ output plugins.
 
 How many times should the client retry a failing URL. We highly recommend NOT setting this value
 to zero if keepalive is enabled. Some servers incorrectly end keepalives early requiring a retry!
+Only IO related failures will be retried, such as connection timeouts and unreachable hosts.
+Valid but non 2xx HTTP responses will always be retried, regardless of the value of this setting, unless `retry_failed` is set.
 Note: if `retry_non_idempotent` is set only GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
 
 [id="plugins-{type}s-{plugin}-cacert"]
@@ -296,8 +298,7 @@ If you'd like to use an HTTP proxy . This supports multiple configuration syntax
   * Value type is <<number,number>>
   * Default value is `60`
 
-This module makes it easy to add a very fully configured HTTP client to Logstash
-based on https://github.com/cheald/manticore[Manticore].
+This module helps you add a fully configured HTTP client to Logstash based on https://github.com/cheald/manticore[Manticore].
 For an example, see {logstash-ref}/plugins-inputs-http_poller.html[input-http_poller] timeout (in seconds) for the entire request.
 
 [id="plugins-{type}s-{plugin}-retry_failed"]
