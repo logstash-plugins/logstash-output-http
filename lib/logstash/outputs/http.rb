@@ -252,16 +252,22 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   rescue => exception
     will_retry = retryable_exception?(exception)
-    log_failure("Could not fetch URL",
-                :url => url,
-                :method => @http_method,
-                :body => body,
-                :headers => headers,
-                :message => exception.message,
-                :class => exception.class.name,
-                :backtrace => exception.backtrace,
-                :will_retry => will_retry
-    )
+    log_parameters = {
+      :url => url,
+      :method => @http_method,
+      :message => exception.message,
+      :class => exception.class.name,
+      :will_retry => will_retry
+    }
+    if @logger.debug?
+      # backtraces are big
+      log_params[:backtrace] = exception.backtrace
+      # headers can have sensitive data
+      log_params[:headers] = headers
+      # body can be big and may have sensitive data
+      log_params[:body] = body
+    end
+    log_failure("Could not fetch URL", log_params)
 
     if will_retry
       return :retry, event, attempt

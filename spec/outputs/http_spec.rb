@@ -165,6 +165,14 @@ describe LogStash::Outputs::Http do
         it "should log a failure" do
           expect(subject).to have_received(:log_failure).with(any_args)
         end
+
+        it "should not log headers" do
+          expect(subject).to have_received(:log_failure).with(anything, hash_not_including(:headers))
+        end
+
+        it "should not log the body" do
+          expect(subject).to have_received(:log_failure).with(anything, hash_not_including(:body))
+        end
       end
 
       context "with ignorable failing requests" do
