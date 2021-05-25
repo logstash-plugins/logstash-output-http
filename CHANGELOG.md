@@ -1,3 +1,6 @@
+## 5.2.5
+  - Reduce amount of default logging on a failed request [#122](https://github.com/logstash-plugins/logstash-output-http/pull/122)
+
 ## 5.2.4
   - Relax dependency on http_client mixin since current major works on both
 
