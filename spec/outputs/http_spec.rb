@@ -197,7 +197,43 @@ describe LogStash::Outputs::Http do
           expect(subject).to have_received(:send_event).exactly(3).times
         end
       end
+    end
 
+    context "on exception" do
+      before :each do
+        allow(subject.client).to receive(:send).and_raise RuntimeError
+        subject.multi_receive([event])
+      end
+
+      it "should not log headers" do
+        expect(subject).to have_received(:log_failure).with(anything, hash_not_including(:headers))
+      end
+
+      it "should not log the body" do
+        expect(subject).to have_received(:log_failure).with(anything, hash_not_including(:body))
+      end
+
+      context "with debug log level" do
+        before :all do
+          @current_log_level = LogStash::Logging::Logger.get_logging_context.get_root_logger.get_level.to_s.downcase
+          LogStash::Logging::Logger.configure_logging "debug"
+        end
+        after :all do
+          LogStash::Logging::Logger.configure_logging @current_log_level
+        end
+
+        it "should log a failure" do
+          expect(subject).to have_received(:log_failure).with(any_args)
+        end
+
+        it "should not log headers" do
+          expect(subject).to have_received(:log_failure).with(anything, hash_including(:headers))
+        end
+
+        it "should not log the body" do
+          expect(subject).to have_received(:log_failure).with(anything, hash_including(:body))
+        end
+      end
     end
   end
 
