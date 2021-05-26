@@ -196,9 +196,9 @@ describe LogStash::Outputs::Http do
         it "should make three total requests" do
           expect(subject).to have_received(:send_event).exactly(3).times
         end
-
       end
     end
+
     context "on exception" do
       before :each do
         allow(subject.client).to receive(:send).and_raise RuntimeError
