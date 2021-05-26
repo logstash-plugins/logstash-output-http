@@ -165,7 +165,6 @@ describe LogStash::Outputs::Http do
         it "should log a failure" do
           expect(subject).to have_received(:log_failure).with(any_args)
         end
-
       end
 
       context "with ignorable failing requests" do
