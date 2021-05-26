@@ -252,7 +252,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   rescue => exception
     will_retry = retryable_exception?(exception)
-    log_parameters = {
+    log_params = {
       :url => url,
       :method => @http_method,
       :message => exception.message,
