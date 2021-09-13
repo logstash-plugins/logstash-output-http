@@ -23,6 +23,9 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     ::Manticore::SocketTimeout
   ]
 
+  CONNECTION_RESET_SNIPPET = /Connection reset by peer/i
+
+
   # This output lets you send events to a
   # generic HTTP(S) endpoint
   #
@@ -295,7 +298,15 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   def retryable_exception?(exception)
-    RETRYABLE_MANTICORE_EXCEPTIONS.any? {|me| exception.is_a?(me) }
+    retryable_manticore_exception?(exception) || retryable_unknown_exception?(exception)
+  end
+
+  def retryable_manticore_exception?(exception)
+    RETRYABLE_MANTICORE_EXCEPTIONS.any? {|me| exception.is_a?(me)}
+  end
+
+  def retryable_unknown_exception?(exception)
+    exception.is_a?(::Manticore::UnknownException) && exception.message =~ CONNECTION_RESET_SNIPPET
   end
 
   # This is split into a separate method mostly to help testing
