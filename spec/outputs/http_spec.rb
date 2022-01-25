@@ -77,21 +77,18 @@ RSpec.configure do |config|
   def sinatra_run_wait(app, opts)
     queue = Queue.new
 
-    t = java.lang.Thread.new(
-      proc do
-        begin
-          app.run!(opts) do |server|
-            queue.push("started")
-          end
-        rescue => e
-          puts "Error in webserver thread #{e}"
-          # ignore
+    Thread.start do
+      begin
+        app.start!(opts) do |server|
+          queue.push(server)
         end
+      rescue => e
+        warn "Error in webserver thread #{e}"
+        # ignore
       end
-    )
-    t.daemon = true
-    t.start
-    queue.pop # blocks until the run! callback runs
+    end
+
+    queue.pop # blocks until the start! callback runs
   end
 
   config.before(:suite) do
