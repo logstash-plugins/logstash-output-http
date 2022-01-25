@@ -25,6 +25,9 @@ class TestApp < Sinatra::Base
   # on the fly uncompress gzip content
   use CompressedRequests
 
+  set :environment, :production
+  set :sessions, false
+
   @@server_settings = {
       :AccessLog => [], # disable WEBrick logging
       :Logger => WEBrick::BasicLog::new(nil, WEBrick::BasicLog::FATAL)
