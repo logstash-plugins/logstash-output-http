@@ -66,6 +66,7 @@ This plugin supports the following configuration options plus the <<plugins-{typ
 | <<plugins-{type}s-{plugin}-retry_non_idempotent>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-retryable_codes>> |<<number,number>>|No
 | <<plugins-{type}s-{plugin}-socket_timeout>> |<<number,number>>|No
+| <<plugins-{type}s-{plugin}-ssl_verification_mode>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-truststore>> |a valid filesystem path|No
 | <<plugins-{type}s-{plugin}-truststore_password>> |<<password,password>>|No
 | <<plugins-{type}s-{plugin}-truststore_type>> |<<string,string>>|No
@@ -336,6 +337,18 @@ If encountered as response codes this plugin will retry these requests
   * Default value is `10`
 
 Timeout (in seconds) to wait for data on the socket. Default is `10s`
+
+[id="plugins-{type}s-{plugin}-ssl_verification_mode"]
+===== `ssl_verification_mode`
+
+  * Value type is <<string,string>>
+  * Supported values are: `full`, `none`
+  * Default value is `full`
+
+Allows for disabling the verification performed by the plugin when the TLS certificate
+is retrieved from the server. The certificate's host-name must match the `url`'s host.
+Also, set the option to `none` when dealing with self signed certificates as those aren't
+considered valid, unless the certificate is part of the `truststore`.
 
 [id="plugins-{type}s-{plugin}-truststore"]
 ===== `truststore` 
