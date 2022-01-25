@@ -345,10 +345,14 @@ Timeout (in seconds) to wait for data on the socket. Default is `10s`
   * Supported values are: `full`, `none`
   * Default value is `full`
 
-Allows for disabling the verification performed by the plugin when the TLS certificate
-is retrieved from the server. The certificate's host-name must match the `url`'s host.
-Also, set the option to `none` when dealing with self signed certificates as those aren't
-considered valid, unless the certificate is part of the `truststore`.
+Controls the verification of server certificates.
+The `full` option verifies that the provided certificate is signed by a trusted authority (CA)
+and also that the server’s hostname (or IP address) matches the names identified within the certificate.
+
+The `none` setting performs no verification of the server’s certificate.
+This mode disables many of the security benefits of SSL/TLS and should only be used after cautious consideration.
+It is primarily intended as a temporary diagnostic mechanism when attempting to resolve TLS errors;
+its use in production environments is strongly discouraged.
 
 [id="plugins-{type}s-{plugin}-truststore"]
 ===== `truststore` 
