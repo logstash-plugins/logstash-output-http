@@ -3,6 +3,9 @@ require "logstash/outputs/http"
 require "logstash/codecs/plain"
 require "thread"
 require "sinatra"
+require "webrick"
+require "webrick/https"
+require 'openssl'
 require_relative "../supports/compressed_requests"
 
 PORT = rand(65535-1024) + 1025
@@ -72,34 +75,36 @@ class TestApp < Sinatra::Base
   end
 end
 
-RSpec.configure do |config|
+RSpec.configure do
   #http://stackoverflow.com/questions/6557079/start-and-call-ruby-http-server-in-the-same-script
-  def sinatra_run_wait(app, opts)
+  def start_app_and_wait(app, opts = {})
     queue = Queue.new
 
     Thread.start do
       begin
-        app.start!(opts) do |server|
+        app.start!({ server: 'WEBrick', port: PORT }.merge opts) do |server|
           queue.push(server)
         end
       rescue => e
-        warn "Error in webserver thread #{e}"
-        # ignore
+        warn "Error starting app: #{e.inspect}" # ignore
       end
     end
 
     queue.pop # blocks until the start! callback runs
-  end
-
-  config.before(:suite) do
-    sinatra_run_wait(TestApp, :port => PORT, :server => 'webrick')
-    puts "Test webserver on port #{PORT}"
   end
 end
 
 describe LogStash::Outputs::Http do
   # Wait for the async request to finish in this spinlock
   # Requires pool_max to be 1
+
+  before(:all) do
+    @server = start_app_and_wait(TestApp)
+  end
+
+  after(:all) do
+    @server.stop # WEBrick::HTTPServer
+  end
 
   let(:port) { PORT }
   let(:event) {
