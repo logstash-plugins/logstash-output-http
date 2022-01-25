@@ -25,9 +25,17 @@ class TestApp < Sinatra::Base
   # on the fly uncompress gzip content
   use CompressedRequests
 
-  # disable WEBrick logging
+  @@server_settings = {
+      :AccessLog => [], # disable WEBrick logging
+      :Logger => WEBrick::BasicLog::new(nil, WEBrick::BasicLog::FATAL)
+  }
+
   def self.server_settings
-    { :AccessLog => [], :Logger => WEBrick::BasicLog::new(nil, WEBrick::BasicLog::FATAL) }
+    @@server_settings
+  end
+
+  def self.server_settings=(settings)
+    @@server_settings = settings
   end
 
   def self.multiroute(methods, path, &block)
@@ -103,7 +111,8 @@ describe LogStash::Outputs::Http do
   end
 
   after(:all) do
-    @server.stop # WEBrick::HTTPServer
+    @server.shutdown # WEBrick::HTTPServer
+    TestApp.stop!
   end
 
   let(:port) { PORT }
@@ -399,4 +408,76 @@ describe LogStash::Outputs::Http do
       let(:base_config) { { "http_compression" => true } }
     end
   end
+end
+
+describe LogStash::Outputs::Http do # different block as we're starting web server with TLS
+
+  @@default_server_settings = TestApp.server_settings.dup
+
+  before do
+    cert, key = WEBrick::Utils.create_self_signed_cert 2048, [["CN", ssl_cert_host]], "Logstash testing"
+    TestApp.server_settings = @@default_server_settings.merge({
+       :SSLEnable       => true,
+       :SSLVerifyClient => OpenSSL::SSL::VERIFY_NONE,
+       :SSLCertificate  => cert,
+       :SSLPrivateKey   => key
+    })
+
+    TestApp.last_request = nil
+
+    @server = start_app_and_wait(TestApp)
+  end
+
+  after do
+    @server.shutdown # WEBrick::HTTPServer
+
+    TestApp.stop!
+    TestApp.server_settings = @@default_server_settings
+  end
+
+  let(:ssl_cert_host) { 'localhost' }
+
+  let(:port) { PORT }
+  let(:url) { "https://localhost:#{port}/good" }
+  let(:method) { "post" }
+
+  let(:config) { { "url" => url, "http_method" => method } }
+
+  subject { LogStash::Outputs::Http.new(config) }
+
+  before { subject.register }
+  after  { subject.close }
+
+  let(:last_request) { TestApp.last_request }
+  let(:last_request_body) { last_request.body.read }
+
+  let(:event) { LogStash::Event.new("message" => "hello!") }
+
+  context 'with default (full) verification' do
+
+    let(:config) { super() } # 'ssl_verification_mode' => 'full'
+
+    it "does NOT process the request (due client protocol exception)" do
+      # Manticore's default verification does not accept self-signed certificates!
+      Thread.start do
+        subject.multi_receive [ event ]
+      end
+      sleep 1.5
+
+      expect(last_request).to be nil
+    end
+
+  end
+
+  context 'with verification disabled' do
+
+    let(:config) { super().merge 'ssl_verification_mode' => 'none' }
+
+    it "should process the request" do
+      subject.multi_receive [ event ]
+      expect(last_request_body).to include '"message":"hello!"'
+    end
+
+  end
+
 end
