@@ -138,10 +138,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   def log_retryable_response(response)
+    retry_msg = @retry_failed ? 'will retry' : "won't retry"
     if (response.code == 429)
-      @logger.debug? && @logger.debug("Encountered a 429 response, will retry. This is not serious, just flow control via HTTP")
+      @logger.debug? && @logger.debug("Encountered a 429 response, #{retry_msg}. This is not serious, just flow control via HTTP")
     else
-      @logger.warn("Encountered a retryable HTTP request in HTTP output, will retry", :code => response.code, :body => response.body)
+      @logger.warn("Encountered a retryable HTTP request in HTTP output, #{retry_msg}", :code => response.code, :body => response.body)
     end
   end
 
