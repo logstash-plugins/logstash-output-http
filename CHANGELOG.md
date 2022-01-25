@@ -1,3 +1,6 @@
+## 5.3.0
+  - Feat: support ssl_verification_mode option [#126](https://github.com/logstash-plugins/logstash-output-http/pull/126)
+
 ## 5.2.5
   - Reduce amount of default logging on a failed request [#122](https://github.com/logstash-plugins/logstash-output-http/pull/122)
 
