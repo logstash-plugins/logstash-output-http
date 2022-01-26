@@ -115,7 +115,7 @@ describe LogStash::Outputs::Http do
 
   after(:all) do
     @server.shutdown # WEBrick::HTTPServer
-    TestApp.stop!
+    TestApp.stop! rescue nil
   end
 
   let(:port) { PORT }
@@ -434,7 +434,7 @@ describe LogStash::Outputs::Http do # different block as we're starting web serv
   after do
     @server.shutdown # WEBrick::HTTPServer
 
-    TestApp.stop!
+    TestApp.stop! rescue nil
     TestApp.server_settings = @@default_server_settings
   end
 
