@@ -23,7 +23,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     ::Manticore::SocketTimeout
   ]
 
-  CONNECTION_RESET_SNIPPET = /Connection reset by peer/i
+  RETRYABLE_UNKNOWN_EXCEPTION_STRINGS = [
+    /Connection reset by peer/i,
+    /Read Timed out/i
+  ]
 
 
   # This output lets you send events to a
@@ -306,7 +309,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   def retryable_unknown_exception?(exception)
-    exception.is_a?(::Manticore::UnknownException) && exception.message =~ CONNECTION_RESET_SNIPPET
+    exception.is_a?(::Manticore::UnknownException) &&
+        RETRYABLE_UNKNOWN_EXCEPTION_STRINGS.any? { |snippet| exception.message =~ snippet }
   end
 
   # This is split into a separate method mostly to help testing

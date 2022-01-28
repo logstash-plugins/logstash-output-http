@@ -259,7 +259,7 @@ describe LogStash::Outputs::Http do
         expect(subject.client).to receive(:send) do |*args|
           unless raised
             raised = true
-            raise ::Manticore::UnknownException.new("Connection Reset By Peer")
+            raise ::Manticore::UnknownException.new("Read timed out")
           end
           original_method.call(args)
         end
