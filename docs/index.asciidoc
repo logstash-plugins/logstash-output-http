@@ -351,8 +351,8 @@ and also that the server’s hostname (or IP address) matches the names identifi
 
 The `none` setting performs no verification of the server’s certificate.
 This mode disables many of the security benefits of SSL/TLS and should only be used after cautious consideration.
-It is primarily intended as a temporary diagnostic mechanism when attempting to resolve TLS errors;
-its use in production environments is strongly discouraged.
+It is primarily intended as a temporary diagnostic mechanism when attempting to resolve TLS errors.
+Using `none`  in production environments is strongly discouraged.
 
 [id="plugins-{type}s-{plugin}-truststore"]
 ===== `truststore` 
