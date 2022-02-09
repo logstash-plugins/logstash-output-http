@@ -1,3 +1,6 @@
+## 5.4.0
+  - Introduce retryable unknown exceptions for "connection reset by peer" and "timeout" [#127](https://github.com/logstash-plugins/logstash-output-http/pull/127)
+
 ## 5.3.0
   - Feat: support ssl_verification_mode option [#126](https://github.com/logstash-plugins/logstash-output-http/pull/126)
 
