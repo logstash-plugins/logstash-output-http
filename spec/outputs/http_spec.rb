@@ -126,6 +126,44 @@ describe LogStash::Outputs::Http do
   let(:method) { "post" }
 
   shared_examples("verb behavior") do |method|
+
+    shared_examples("failure log behaviour") do
+      it "logs failure" do
+        expect(subject).to have_received(:log_failure).with(any_args)
+      end
+
+      it "does not log headers" do
+        expect(subject).to have_received(:log_failure).with(anything, hash_not_including(:headers))
+      end
+
+      it "does not log the message body" do
+        expect(subject).to have_received(:log_failure).with(anything, hash_not_including(:body))
+      end
+
+      context "with debug log level" do
+        before :all do
+          @current_log_level = LogStash::Logging::Logger.get_logging_context.get_root_logger.get_level.to_s.downcase
+          LogStash::Logging::Logger.configure_logging "debug"
+        end
+        after :all do
+          LogStash::Logging::Logger.configure_logging @current_log_level
+        end
+
+        it "logs a failure" do
+          expect(subject).to have_received(:log_failure).with(any_args)
+        end
+
+        it "logs headers" do
+          expect(subject).to have_received(:log_failure).with(anything, hash_including(:headers))
+        end
+
+        it "logs the body" do
+          expect(subject).to have_received(:log_failure).with(anything, hash_including(:body))
+        end
+      end
+
+    end
+
     let(:verb_behavior_config) { {"url" => url, "http_method" => method, "pool_max" => 1} }
     subject { LogStash::Outputs::Http.new(verb_behavior_config) }
 
@@ -213,43 +251,95 @@ describe LogStash::Outputs::Http do
       end
     end
 
-    context "on exception" do
+    context "on retryable unknown exception" do
       before :each do
-        allow(subject.client).to receive(:send).and_raise RuntimeError
+        raised = false
+        original_method = subject.client.method(:send)
+        allow(subject).to receive(:send_event).and_call_original
+        expect(subject.client).to receive(:send) do |*args|
+          unless raised
+            raised = true
+            raise ::Manticore::UnknownException.new("Read timed out")
+          end
+          original_method.call(args)
+        end
         subject.multi_receive([event])
       end
 
-      it "should not log headers" do
-        expect(subject).to have_received(:log_failure).with(anything, hash_not_including(:headers))
-      end
+      include_examples("failure log behaviour")
 
-      it "should not log the body" do
-        expect(subject).to have_received(:log_failure).with(anything, hash_not_including(:body))
-      end
-
-      context "with debug log level" do
-        before :all do
-          @current_log_level = LogStash::Logging::Logger.get_logging_context.get_root_logger.get_level.to_s.downcase
-          LogStash::Logging::Logger.configure_logging "debug"
-        end
-        after :all do
-          LogStash::Logging::Logger.configure_logging @current_log_level
-        end
-
-        it "should log a failure" do
-          expect(subject).to have_received(:log_failure).with(any_args)
-        end
-
-        it "should not log headers" do
-          expect(subject).to have_received(:log_failure).with(anything, hash_including(:headers))
-        end
-
-        it "should not log the body" do
-          expect(subject).to have_received(:log_failure).with(anything, hash_including(:body))
-        end
+      it "retries" do
+        expect(subject).to have_received(:send_event).exactly(2).times
       end
     end
+
+    context "on non-retryable unknown exception" do
+      before :each do
+        raised = false
+        original_method = subject.client.method(:send)
+        allow(subject).to receive(:send_event).and_call_original
+        expect(subject.client).to receive(:send) do |*args|
+          unless raised
+            raised = true
+            raise ::Manticore::UnknownException.new("broken")
+          end
+          original_method.call(args)
+        end
+        subject.multi_receive([event])
+      end
+
+      include_examples("failure log behaviour")
+
+      it "does not retry" do
+        expect(subject).to have_received(:send_event).exactly(1).times
+      end
+    end
+
+    context "on non-retryable exception" do
+      before :each do
+        raised = false
+        original_method = subject.client.method(:send)
+        allow(subject).to receive(:send_event).and_call_original
+        expect(subject.client).to receive(:send) do |*args|
+          unless raised
+            raised = true
+            raise RuntimeError.new("broken")
+          end
+          original_method.call(args)
+        end
+        subject.multi_receive([event])
+      end
+
+      include_examples("failure log behaviour")
+
+      it "does not retry" do
+        expect(subject).to have_received(:send_event).exactly(1).times
+      end
+    end
+
+    context "on retryable exception" do
+      before :each do
+        raised = false
+        original_method = subject.client.method(:send)
+        allow(subject).to receive(:send_event).and_call_original
+        expect(subject.client).to receive(:send) do |*args|
+          unless raised
+            raised = true
+            raise ::Manticore::Timeout.new("broken")
+          end
+          original_method.call(args)
+        end
+        subject.multi_receive([event])
+      end
+
+      it "retries" do
+        expect(subject).to have_received(:send_event).exactly(2).times
+      end
+
+      include_examples("failure log behaviour")
+    end
   end
+
 
   LogStash::Outputs::Http::VALID_METHODS.each do |method|
     context "when using '#{method}'" do
