@@ -511,7 +511,7 @@ describe LogStash::Outputs::Http do
 
     before do
       subject.register
-      allow(subject).to receive(:shutdown_requested).and_return(true)
+      allow(subject).to receive(:pipeline_shutdown_requested?).and_return(true)
     end
 
     it "raise exception to exit indefinitely retry" do
