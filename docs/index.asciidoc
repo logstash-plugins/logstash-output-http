@@ -31,6 +31,19 @@ guaranteed!
 
 Beware, this gem does not yet support codecs. Please use the 'format' option for now.
 
+[id="plugins-{type}s-{plugin}-retry_policy"]
+==== Retry policy
+
+This output has two levels of retry, library and plugin.
+
+The library only retry IO related failures. Non retriable IOException include InterruptedIOException, UnknownHostException, ConnectException and SSLException.
+`automatic_retries`, `retry_non_idempotent` are the flags for library retry.
+`automatic_retries` controls the number of times of retry in the library level.
+`retry_non_idempotent` set to `false` means GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
+
+The plugin level retry has two flags `retry_failed` and `retryable_codes`.
+
+
 [id="plugins-{type}s-{plugin}-options"]
 ==== Http Output Configuration Options
 
