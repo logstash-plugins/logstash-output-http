@@ -46,7 +46,7 @@ connection issues, and OS/JVM level interruptions happening during a request.
 The options for library retry are: 
 
 * <<plugins-{type}s-{plugin}-automatic_retries,`automatic_retries`>>. 
-Controls the number of times of retry in the library level.
+Controls the number of times the plugin should retry after failures at the library level.
 * <<plugins-{type}s-{plugin}-retry_non_idempotent,`retry_non_idempotent`>>. 
 When set to `false`, GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be
 retried.
