@@ -356,7 +356,7 @@ See <<plugins-{type}s-{plugin}-retry_policy,Retry policy>> for more information.
   * Value type is <<boolean,boolean>>
   * Default value is `false`
 
-When set to `false` and `automatic_retries` is enabled, GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
+When this option is set to `false` and `automatic_retries` is enabled, GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
 
 When set to `true` and `automatic_retries` is enabled, this will cause non-idempotent HTTP verbs (such as POST) to be retried.
 See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
