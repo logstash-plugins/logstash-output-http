@@ -57,10 +57,9 @@ retried.
 The options for plugin level retry are: 
 
 * <<plugins-{type}s-{plugin}-retry_failed,`retry_failed`>>. 
-When set to `true`, the plugin retries indefinitely for HTTP responses defined
+When set to `true`, the plugin retries indefinitely for HTTP error response codes defined
 in the <<plugins-{type}s-{plugin}-retryable_codes,`retryable_codes`>> option
-(429, 500, 502, 503, 504) and retryable exceptions (Timeout, SocketException,
-ClientProtocolException, ResolutionFailure and SocketTimeout).
+(429, 500, 502, 503, 504) and retryable exceptions (socket timeout/ error, DNS resolution failure and client protocol exception).
 * <<plugins-{type}s-{plugin}-retryable_codes,`retryable_codes`>>. 
 Sets http response codes that trigger a retry. 
 
@@ -121,7 +120,8 @@ output plugins.
   * Default value is `1`
 
 How many times should the client retry a failing URL. We recommend setting this option
-to a value other than zero if the <<plugins-{type}s-{plugin}-keepalive,`keepalive` option>> is enabled. Some servers incorrectly end keepalives early, requiring a retry.
+to a value other than zero if the <<plugins-{type}s-{plugin}-keepalive,`keepalive` option>> is enabled. 
+Some servers incorrectly end keepalives early, requiring a retry.
 See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-cacert"]
@@ -343,10 +343,11 @@ Timeout (in seconds) for the entire request
   * Value type is <<boolean,boolean>>
   * Default value is `true`
 
-Note that this option controls retries for plugin-level requests only. 
+Note that this option controls plugin-level retries only. 
 It has no affect on library-level retries. 
 
-Set this option to `false` if you want to disable retries on failed plugin-level requests.
+Set this option to `false` if you want to disable infinite retries for HTTP error response codes defined in the <<plugins-{type}s-{plugin}-retryable_codes,`retryable_codes`>> or 
+retryable exceptions (Timeout, SocketException, ClientProtocolException, ResolutionFailure and SocketTimeout).
 See <<plugins-{type}s-{plugin}-retry_policy,Retry policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-retry_non_idempotent"]
@@ -355,8 +356,10 @@ See <<plugins-{type}s-{plugin}-retry_policy,Retry policy>> for more information.
   * Value type is <<boolean,boolean>>
   * Default value is `false`
 
-If `automatic_retries` is enabled this will cause non-idempotent HTTP verbs (such as POST) to be retried.
-This only affects connectivity related errors (see related `automatic_retries` setting).
+When set to `false` and `automatic_retries` is enabled, GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
+
+When set to `true` and `automatic_retries` is enabled, this will cause non-idempotent HTTP verbs (such as POST) to be retried.
+See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-retryable_codes"]
 ===== `retryable_codes` 
@@ -364,7 +367,8 @@ This only affects connectivity related errors (see related `automatic_retries` s
   * Value type is <<number,number>>
   * Default value is `[429, 500, 502, 503, 504]`
 
-If encountered as response codes this plugin will retry these requests
+If encountered these response codes, the plugin will retry indefinitely
+See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-socket_timeout"]
 ===== `socket_timeout` 
