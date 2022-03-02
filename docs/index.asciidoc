@@ -36,16 +36,35 @@ Beware, this gem does not yet support codecs. Please use the 'format' option for
 
 This output has two levels of retry: library and plugin.
 
-The library only retry IO related failures. Non retriable errors include SSL related problems, unresolvable host, connection issues and OS/JVM level interruptions happening during a request.
-`automatic_retries`, `retry_non_idempotent` are the flags for library retry.
-`automatic_retries` controls the number of times of retry in the library level.
-`retry_non_idempotent` set to `false` means GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
+[id="plugins-{type}s-{plugin}-library_retry"]
+===== Library retry
 
-The plugin level retry has two flags `retry_failed` and `retryable_codes`.
-`retry_failed` retry indefinitely for HTTP responses defining in `retryable_codes` (429, 500, 502, 503, 504)
-and retryable exceptions (Timeout, SocketException, ClientProtocolException, ResolutionFailure and SocketTimeout)
+The library retry applies to IO related failures. 
+Non retriable errors include SSL related problems, unresolvable hosts,
+connection issues, and OS/JVM level interruptions happening during a request.
 
-NOTE: `retry_failed` does not control the library level retry.
+The options for library retry are: 
+
+* <<plugins-{type}s-{plugin}-automatic_retries,`automatic_retries`>>. 
+Controls the number of times of retry in the library level.
+* <<plugins-{type}s-{plugin}-retry_non_idempotent,`retry_non_idempotent`>>. 
+When set to `false`, GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be
+retried.
+
+[id="plugins-{type}s-{plugin}-plugin_retry"]
+===== Plugin retry
+
+The options for plugin level retry are: 
+
+* <<plugins-{type}s-{plugin}-retry_failed,`retry_failed`>>. 
+When set to `true`, the plugin retries indefinitely for HTTP responses defined
+in the <<plugins-{type}s-{plugin}-retryable_codes,`retryable_codes`>> option
+(429, 500, 502, 503, 504) and retryable exceptions (Timeout, SocketException,
+ClientProtocolException, ResolutionFailure and SocketTimeout).
+* <<plugins-{type}s-{plugin}-retryable_codes,`retryable_codes`>>. 
+Sets http response codes that trigger a retry. 
+
+NOTE: The `retry_failed` option does not control the library level retry.
 
 [id="plugins-{type}s-{plugin}-options"]
 ==== Http Output Configuration Options
