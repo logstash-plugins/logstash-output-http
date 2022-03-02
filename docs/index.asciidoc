@@ -367,7 +367,7 @@ See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
   * Value type is <<number,number>>
   * Default value is `[429, 500, 502, 503, 504]`
 
-If encountered these response codes, the plugin will retry indefinitely
+If the plugin encounters these response codes, the plugin will retry indefinitely.
 See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-socket_timeout"]
