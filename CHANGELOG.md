@@ -1,3 +1,6 @@
+## 5.4.1
+  - Docs: Add retry policy description [#130](https://github.com/logstash-plugins/logstash-output-http/pull/130) 
+
 ## 5.4.0
   - Introduce retryable unknown exceptions for "connection reset by peer" and "timeout" [#127](https://github.com/logstash-plugins/logstash-output-http/pull/127)
 
