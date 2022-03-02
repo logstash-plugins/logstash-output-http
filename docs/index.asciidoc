@@ -26,10 +26,40 @@ This output lets you send events to a generic HTTP(S) endpoint.
 This output will execute up to 'pool_max' requests in parallel for performance.
 Consider this when tuning this plugin for performance.
 
-Additionally, note that when parallel execution is used strict ordering of events is not
-guaranteed!
+Additionally, note that when parallel execution is used strict ordering of events is not guaranteed!
 
-Beware, this gem does not yet support codecs. Please use the 'format' option for now.
+Beware, this gem does not yet support codecs.
+Please use the 'format' option for now.
+
+[id="plugins-{type}s-{plugin}-retry_policy"]
+==== Retry policy
+
+This output has two levels of retry: library and plugin.
+
+[id="plugins-{type}s-{plugin}-library_retry"]
+===== Library retry
+
+The library retry applies to IO related failures.
+Non retriable errors include SSL related problems, unresolvable hosts, connection issues, and OS/JVM level interruptions happening during a request.
+
+The options for library retry are:
+
+* <<plugins-{type}s-{plugin}-automatic_retries,`automatic_retries`>>.
+Controls the number of times the plugin should retry after failures at the library level.
+* <<plugins-{type}s-{plugin}-retry_non_idempotent,`retry_non_idempotent`>>.
+When set to `false`, GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
+
+[id="plugins-{type}s-{plugin}-plugin_retry"]
+===== Plugin retry
+
+The options for plugin level retry are:
+
+* <<plugins-{type}s-{plugin}-retry_failed,`retry_failed`>>.
+When set to `true`, the plugin retries indefinitely for HTTP error response codes defined in the <<plugins-{type}s-{plugin}-retryable_codes,`retryable_codes`>> option (429, 500, 502, 503, 504) and retryable exceptions (socket timeout/ error, DNS resolution failure and client protocol exception).
+* <<plugins-{type}s-{plugin}-retryable_codes,`retryable_codes`>>.
+Sets http response codes that trigger a retry.
+
+NOTE: The `retry_failed` option does not control the library level retry.
 
 [id="plugins-{type}s-{plugin}-options"]
 ==== Http Output Configuration Options
@@ -82,37 +112,35 @@ output plugins.
 [id="plugins-{type}s-{plugin}-automatic_retries"]
 ===== `automatic_retries` 
 
-  * Value type is <<number,number>>
-  * Default value is `1`
+* Value type is <<number,number>>
+* Default value is `1`
 
-How many times should the client retry a failing URL. We highly recommend NOT setting this value
-to zero if keepalive is enabled. Some servers incorrectly end keepalives early requiring a retry!
-Only IO related failures will be retried, such as connection timeouts and unreachable hosts.
-Valid but non 2xx HTTP responses will always be retried, regardless of the value of this setting,
-unless `retry_failed` is set.
-Note: if `retry_non_idempotent` is NOT set only GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
+How many times should the client retry a failing URL.
+We recommend setting this option to a value other than zero if the <<plugins-{type}s-{plugin}-keepalive,`keepalive` option>> is enabled.
+Some servers incorrectly end keepalives early, requiring a retry.
+See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-cacert"]
 ===== `cacert` 
 
-  * Value type is <<path,path>>
-  * There is no default value for this setting.
+* Value type is <<path,path>>
+* There is no default value for this setting.
 
 If you need to use a custom X.509 CA (.pem certs) specify the path to that here
 
 [id="plugins-{type}s-{plugin}-client_cert"]
 ===== `client_cert` 
 
-  * Value type is <<path,path>>
-  * There is no default value for this setting.
+* Value type is <<path,path>>
+* There is no default value for this setting.
 
 If you'd like to use a client certificate (note, most people don't want this) set the path to the x509 cert here
 
 [id="plugins-{type}s-{plugin}-client_key"]
 ===== `client_key` 
 
-  * Value type is <<path,path>>
-  * There is no default value for this setting.
+* Value type is <<path,path>>
+* There is no default value for this setting.
 
 If you're using a client certificate specify the path to the encryption key here
 
@@ -285,8 +313,8 @@ Max number of concurrent connections to a single host. Defaults to `25`
 [id="plugins-{type}s-{plugin}-proxy"]
 ===== `proxy` 
 
-  * Value type is <<string,string>>
-  * There is no default value for this setting.
+* Value type is <<string,string>>
+* There is no default value for this setting.
 
 If you'd like to use an HTTP proxy . This supports multiple configuration syntaxes:
 
@@ -297,53 +325,60 @@ If you'd like to use an HTTP proxy . This supports multiple configuration syntax
 [id="plugins-{type}s-{plugin}-request_timeout"]
 ===== `request_timeout` 
 
-  * Value type is <<number,number>>
-  * Default value is `60`
+* Value type is <<number,number>>
+* Default value is `60`
 
-This module makes it easy to add a very fully configured HTTP client to logstash
-based on [Manticore](https://github.com/cheald/manticore).
+This module makes it easy to add a very fully configured HTTP client to logstash based on [Manticore](https://github.com/cheald/manticore).
 For an example of its usage see https://github.com/logstash-plugins/logstash-input-http_poller
 Timeout (in seconds) for the entire request
 
 [id="plugins-{type}s-{plugin}-retry_failed"]
 ===== `retry_failed` 
 
-  * Value type is <<boolean,boolean>>
-  * Default value is `true`
+* Value type is <<boolean,boolean>>
+* Default value is `true`
 
-Set this to false if you don't want this output to retry failed requests
+Note that this option controls plugin-level retries only.
+It has no affect on library-level retries.
+
+Set this option to `false` if you want to disable infinite retries for HTTP error response codes defined in the <<plugins-{type}s-{plugin}-retryable_codes,`retryable_codes`>> or retryable exceptions (Timeout, SocketException, ClientProtocolException, ResolutionFailure and SocketTimeout).
+See <<plugins-{type}s-{plugin}-retry_policy,Retry policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-retry_non_idempotent"]
 ===== `retry_non_idempotent` 
 
-  * Value type is <<boolean,boolean>>
-  * Default value is `false`
+* Value type is <<boolean,boolean>>
+* Default value is `false`
 
-If `automatic_retries` is enabled this will cause non-idempotent HTTP verbs (such as POST) to be retried.
-This only affects connectivity related errors (see related `automatic_retries` setting).
+When this option is set to `false` and `automatic_retries` is enabled, GET, HEAD, PUT, DELETE, OPTIONS, and TRACE requests will be retried.
+
+When set to `true` and `automatic_retries` is enabled, this will cause non-idempotent HTTP verbs (such as POST) to be retried.
+See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-retryable_codes"]
 ===== `retryable_codes` 
 
-  * Value type is <<number,number>>
-  * Default value is `[429, 500, 502, 503, 504]`
+* Value type is <<number,number>>
+* Default value is `[429, 500, 502, 503, 504]`
 
-If encountered as response codes this plugin will retry these requests
+If the plugin encounters these response codes, the plugin will retry indefinitely.
+See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-socket_timeout"]
 ===== `socket_timeout` 
 
-  * Value type is <<number,number>>
-  * Default value is `10`
+* Value type is <<number,number>>
+* Default value is `10`
 
-Timeout (in seconds) to wait for data on the socket. Default is `10s`
+Timeout (in seconds) to wait for data on the socket.
+Default is `10s`
 
 [id="plugins-{type}s-{plugin}-ssl_verification_mode"]
 ===== `ssl_verification_mode`
 
-  * Value type is <<string,string>>
-  * Supported values are: `full`, `none`
-  * Default value is `full`
+* Value type is <<string,string>>
+* Supported values are: `full`, `none`
+* Default value is `full`
 
 Controls the verification of server certificates.
 The `full` option verifies that the provided certificate is signed by a trusted authority (CA)
