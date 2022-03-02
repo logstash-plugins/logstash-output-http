@@ -343,8 +343,11 @@ Timeout (in seconds) for the entire request
   * Value type is <<boolean,boolean>>
   * Default value is `true`
 
-Set this to false if you don't want this output to retry plugin level failed requests.
-See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
+Note that this option controls retries for plugin-level requests only. 
+It has no affect on library-level retries. 
+
+Set this option to `false` if you want to disable retries on failed plugin-level requests.
+See <<plugins-{type}s-{plugin}-retry_policy,Retry policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-retry_non_idempotent"]
 ===== `retry_non_idempotent` 
