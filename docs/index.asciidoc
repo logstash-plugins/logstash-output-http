@@ -34,7 +34,7 @@ Beware, this gem does not yet support codecs. Please use the 'format' option for
 [id="plugins-{type}s-{plugin}-retry_policy"]
 ==== Retry policy
 
-This output has two levels of retry, library and plugin.
+This output has two levels of retry: library and plugin.
 
 The library only retry IO related failures. Non retriable errors include SSL related problems, unresolvable host, connection issues and OS/JVM level interruptions happening during a request.
 `automatic_retries`, `retry_non_idempotent` are the flags for library retry.
