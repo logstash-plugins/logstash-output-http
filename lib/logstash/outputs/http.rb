@@ -181,7 +181,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       event, attempt = popped
 
       raise PluginInternalQueueLeftoverError.new("Received pipeline shutdown request but http output has unfinished events. " \
-              "If persistent queue is enabled, events will be retried.") if pipeline_shutdown_requested? && attempt > 2
+              "If persistent queue is enabled, events will be retried.") if attempt > 2 && pipeline_shutdown_requested?
 
       action, event, attempt = send_event(event, attempt)
       begin
