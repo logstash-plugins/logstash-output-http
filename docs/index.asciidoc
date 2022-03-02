@@ -121,7 +121,7 @@ output plugins.
   * Default value is `1`
 
 How many times should the client retry a failing URL. We recommend setting this option
-to zero if keepalive is enabled. Some servers incorrectly end keepalives early requiring a retry.
+to a value other than zero if the <<plugins-{type}s-{plugin}-keepalive,`keepalive` option>> is enabled. Some servers incorrectly end keepalives early, requiring a retry.
 See <<plugins-{type}s-{plugin}-retry_policy,Retry Policy>> for more information.
 
 [id="plugins-{type}s-{plugin}-cacert"]
