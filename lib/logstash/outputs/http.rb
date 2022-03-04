@@ -28,6 +28,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     /Read Timed out/i
   ]
 
+  class PluginInternalQueueLeftoverError < StandardError; end
 
   # This output lets you send events to a
   # generic HTTP(S) endpoint
@@ -179,6 +180,9 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
       event, attempt = popped
 
+      raise PluginInternalQueueLeftoverError.new("Received pipeline shutdown request but http output has unfinished events. " \
+              "If persistent queue is enabled, events will be retried.") if attempt > 2 && pipeline_shutdown_requested?
+
       action, event, attempt = send_event(event, attempt)
       begin
         action = :failure if action == :retry && !@retry_failed
@@ -221,6 +225,11 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
             :message => e.message,
             :backtrace => e.backtrace)
     raise e
+  end
+
+  def pipeline_shutdown_requested?
+    return super if defined?(super) # since LS 8.1.0
+    nil
   end
 
   def sleep_for_attempt(attempt)

@@ -501,6 +501,23 @@ describe LogStash::Outputs::Http do
       let(:base_config) { { "http_compression" => true } }
     end
   end
+
+  describe "retryable error in termination" do
+    let(:url) { "http://localhost:#{port-1}/invalid" }
+    let(:events) { [event] }
+    let(:config) { {"url" => url, "http_method" => "get", "pool_max" => 1} }
+
+    subject { LogStash::Outputs::Http.new(config) }
+
+    before do
+      subject.register
+      allow(subject).to receive(:pipeline_shutdown_requested?).and_return(true)
+    end
+
+    it "raise exception to exit indefinitely retry" do
+      expect { subject.multi_receive(events) }.to raise_error(LogStash::Outputs::Http::PluginInternalQueueLeftoverError)
+    end
+  end
 end
 
 describe LogStash::Outputs::Http do # different block as we're starting web server with TLS
