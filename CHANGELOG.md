@@ -1,8 +1,6 @@
 ## 5.4.1
-
-- Fix retry indefinitely in termination process. This feature requires Logstash
-  8.1 [#129](https://github.com/logstash-plugins/logstash-output-http/pull/129)
-- Docs: Add retry policy description [#130](https://github.com/logstash-plugins/logstash-output-http/pull/130)
+  - Fix retry indefinitely in termination process. This feature requires Logstash 8.1 [#129](https://github.com/logstash-plugins/logstash-output-http/pull/129)
+  - Docs: Add retry policy description [#130](https://github.com/logstash-plugins/logstash-output-http/pull/130)
 
 ## 5.4.0
   - Introduce retryable unknown exceptions for "connection reset by peer" and "timeout" [#127](https://github.com/logstash-plugins/logstash-output-http/pull/127)
