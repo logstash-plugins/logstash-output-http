@@ -15,6 +15,18 @@ class LogStash::Outputs::Http
   attr_reader :request_tokens
 end
 
+# NOTE: extend WEBrick with support for config[:SSLVersion]
+WEBrick::GenericServer.class_eval do
+  alias_method :__setup_ssl_context, :setup_ssl_context
+
+  def setup_ssl_context(config)
+    ctx = __setup_ssl_context(config)
+    ctx.ssl_version = config[:SSLVersion] if config[:SSLVersion]
+    ctx
+  end
+
+end
+
 # note that Sinatra startup and shutdown messages are directly logged to stderr so
 # it is not really possible to disable them without reopening stderr which is not advisable.
 #
@@ -94,6 +106,7 @@ RSpec.configure do
     Thread.start do
       begin
         app.start!({ server: 'WEBrick', port: PORT }.merge opts) do |server|
+          yield(server) if block_given?
           queue.push(server)
         end
       rescue => e
@@ -525,17 +538,23 @@ describe LogStash::Outputs::Http do # different block as we're starting web serv
   @@default_server_settings = TestApp.server_settings.dup
 
   before do
-    cert, key = WEBrick::Utils.create_self_signed_cert 2048, [["CN", ssl_cert_host]], "Logstash testing"
-    TestApp.server_settings = @@default_server_settings.merge({
-       :SSLEnable       => true,
-       :SSLVerifyClient => OpenSSL::SSL::VERIFY_NONE,
-       :SSLCertificate  => cert,
-       :SSLPrivateKey   => key
-    })
+    TestApp.server_settings = @@default_server_settings.merge(webrick_config)
 
     TestApp.last_request = nil
 
-    @server = start_app_and_wait(TestApp)
+    @server = start_app_and_wait(TestApp, &server_setup)
+  end
+
+  let(:server_setup) { lambda { |_| } }
+
+  let(:webrick_config) do
+    cert, key = WEBrick::Utils.create_self_signed_cert 2048, [["CN", ssl_cert_host]], "Logstash testing"
+    {
+      SSLEnable: true,
+      SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
+      SSLCertificate: cert,
+      SSLPrivateKey: key
+    }
   end
 
   after do
@@ -582,6 +601,35 @@ describe LogStash::Outputs::Http do # different block as we're starting web serv
   context 'with verification disabled' do
 
     let(:config) { super().merge 'ssl_verification_mode' => 'none' }
+
+    it "should process the request" do
+      subject.multi_receive [ event ]
+      expect(last_request_body).to include '"message":"hello!"'
+    end
+
+  end
+
+  context 'with supported_protocols set to (disabled) 1.1' do
+
+    let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.1'] }
+
+    it "keeps retrying due a protocol exception" do # TLSv1.1 not enabled by default
+      expect(subject).to receive(:log_failure).
+          with('Could not fetch URL', hash_including(message: 'No appropriate protocol (protocol is disabled or cipher suites are inappropriate)')).
+          at_least(:once)
+      Thread.start { subject.multi_receive [ event ] }
+      sleep 1.0
+    end
+
+  end
+
+  context 'with supported_protocols set to 1.2/1.3' do
+
+    let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.2', 'TLSv1.3'], 'ssl_verification_mode' => 'none' }
+
+    let(:webrick_config) do
+      super().merge SSLVersion: 'TLSv1.2'
+    end
 
     it "should process the request" do
       subject.multi_receive [ event ]
