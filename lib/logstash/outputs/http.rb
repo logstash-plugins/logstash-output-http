@@ -272,7 +272,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       :url => url,
       :method => @http_method,
       :message => exception.message,
-      :class => exception.class.name,
+      :class => exception.class,
       :will_retry => will_retry
     }
     if @logger.debug?

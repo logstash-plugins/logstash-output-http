@@ -611,7 +611,7 @@ describe LogStash::Outputs::Http do # different block as we're starting web serv
 
   context 'with supported_protocols set to (disabled) 1.1' do
 
-    let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.1'] }
+    let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.1'], 'ssl_verification_mode' => 'none' }
 
     it "keeps retrying due a protocol exception" do # TLSv1.1 not enabled by default
       expect(subject).to receive(:log_failure).
@@ -627,9 +627,7 @@ describe LogStash::Outputs::Http do # different block as we're starting web serv
 
     let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.2', 'TLSv1.3'], 'ssl_verification_mode' => 'none' }
 
-    let(:webrick_config) do
-      super().merge SSLVersion: 'TLSv1.2'
-    end
+    let(:webrick_config) { super().merge SSLVersion: 'TLSv1.2' }
 
     it "should process the request" do
       subject.multi_receive [ event ]
