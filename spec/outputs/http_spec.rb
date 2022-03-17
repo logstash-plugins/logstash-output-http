@@ -518,4 +518,17 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
 
   end
 
+  context 'with supported_protocols set to 1.3' do
+
+    let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.3'], 'ssl_verification_mode' => 'none' }
+
+    let(:webrick_config) { super().merge SSLVersion: 'TLSv1.3' }
+
+    it "should process the request" do
+      subject.multi_receive [ event ]
+      expect(last_request_body).to include '"message":"hello!"'
+    end
+
+  end if tls_version_enabled_by_default?('TLSv1.3')
+
 end
