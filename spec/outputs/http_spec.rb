@@ -529,6 +529,6 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
       expect(last_request_body).to include '"message":"hello!"'
     end
 
-  end if tls_version_enabled_by_default?('TLSv1.3')
+  end if tls_version_enabled_by_default?('TLSv1.3') && JOpenSSL::VERSION > '0.12' # due WEBrick uses OpenSSL
 
 end
