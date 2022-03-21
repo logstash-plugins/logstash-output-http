@@ -388,9 +388,14 @@ Timeout (in seconds) to wait for data on the socket. Default is `10s`
 
 List of allowed SSL/TLS versions to use when establishing a connection to the HTTP endpoint.
 The default depends on the JDK being used and with up-to-date Logstash is `['TLSv1.2', 'TLSv1.3']`.
+`TLSv1.1` is not considered secure and is only provided for legacy applications.
 
 When using Java 8 `TLSv1.3` is only supported since **8u262** (AdoptOpenJDK) but requires setting the
 `LS_JAVA_OPTS="-Djdk.tls.client.protocols=TLSv1.3"` system property in Logstash.
+
+NOTE: when configuring the plugin to use `TLSv1.1` on any recent JVM, such as the one packaged with Logstash,
+the protocol is disabled by default and needs to be enabled manually by changing `jdk.tls.disabledAlgorithms` in
+the *$JDK_HOME/conf/security/java.security* configuration file (`TLSv1.1` needs to be removed from the list).
 
 [id="plugins-{type}s-{plugin}-ssl_verification_mode"]
 ===== `ssl_verification_mode`
