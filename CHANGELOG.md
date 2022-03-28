@@ -1,3 +1,6 @@
+## 5.5.0
+  - Feat: added `ssl_supported_protocols` option [#131](https://github.com/logstash-plugins/logstash-output-http/pull/131)
+
 ## 5.4.1
   - Fix retry indefinitely in termination process. This feature requires Logstash 8.1 [#129](https://github.com/logstash-plugins/logstash-output-http/pull/129)
   - Docs: Add retry policy description [#130](https://github.com/logstash-plugins/logstash-output-http/pull/130)

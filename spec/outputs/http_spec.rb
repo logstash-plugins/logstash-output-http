@@ -1,109 +1,4 @@
-require "logstash/devutils/rspec/spec_helper"
-require "logstash/outputs/http"
-require "logstash/codecs/plain"
-require "thread"
-require "sinatra"
-require "webrick"
-require "webrick/https"
-require 'openssl'
-require_relative "../supports/compressed_requests"
-
-PORT = rand(65535-1024) + 1025
-
-class LogStash::Outputs::Http
-  attr_writer :agent
-  attr_reader :request_tokens
-end
-
-# note that Sinatra startup and shutdown messages are directly logged to stderr so
-# it is not really possible to disable them without reopening stderr which is not advisable.
-#
-# == Sinatra (v1.4.6) has taken the stage on 51572 for development with backup from WEBrick
-# == Sinatra has ended his set (crowd applauds)
-#
-class TestApp < Sinatra::Base
-  # on the fly uncompress gzip content
-  use CompressedRequests
-
-  set :environment, :production
-  set :sessions, false
-
-  @@server_settings = {
-      :AccessLog => [], # disable WEBrick logging
-      :Logger => WEBrick::BasicLog::new(nil, WEBrick::BasicLog::FATAL)
-  }
-
-  def self.server_settings
-    @@server_settings
-  end
-
-  def self.server_settings=(settings)
-    @@server_settings = settings
-  end
-
-  def self.multiroute(methods, path, &block)
-    methods.each do |method|
-      method.to_sym
-      self.send method, path, &block
-    end
-  end
-
-  def self.last_request=(request)
-    @last_request = request
-  end
-
-  def self.last_request
-    @last_request
-  end
-
-  def self.retry_fail_count=(count)
-    @retry_fail_count = count
-  end
-
-  def self.retry_fail_count()
-    @retry_fail_count || 2
-  end
-
-  multiroute(%w(get post put patch delete), "/good") do
-    self.class.last_request = request
-    [200, "YUP"]
-  end
-
-  multiroute(%w(get post put patch delete), "/bad") do
-    self.class.last_request = request
-    [400, "YUP"]
-  end
-
-  multiroute(%w(get post put patch delete), "/retry") do
-    self.class.last_request = request
-
-    if self.class.retry_fail_count > 0
-      self.class.retry_fail_count -= 1
-      [429, "Will succeed in #{self.class.retry_fail_count}"]
-    else
-      [200, "Done Retrying"]
-    end
-  end
-end
-
-RSpec.configure do
-  #http://stackoverflow.com/questions/6557079/start-and-call-ruby-http-server-in-the-same-script
-  def start_app_and_wait(app, opts = {})
-    queue = Queue.new
-
-    Thread.start do
-      begin
-        app.start!({ server: 'WEBrick', port: PORT }.merge opts) do |server|
-          queue.push(server)
-        end
-      rescue => e
-        warn "Error starting app: #{e.inspect}" # ignore
-      end
-    end
-
-    queue.pop # blocks until the start! callback runs
-  end
-end
+require File.expand_path('../spec_helper.rb', File.dirname(__FILE__))
 
 describe LogStash::Outputs::Http do
   # Wait for the async request to finish in this spinlock
@@ -520,22 +415,26 @@ describe LogStash::Outputs::Http do
   end
 end
 
-describe LogStash::Outputs::Http do # different block as we're starting web server with TLS
+RSpec.describe LogStash::Outputs::Http do # different block as we're starting web server with TLS
 
   @@default_server_settings = TestApp.server_settings.dup
 
   before do
-    cert, key = WEBrick::Utils.create_self_signed_cert 2048, [["CN", ssl_cert_host]], "Logstash testing"
-    TestApp.server_settings = @@default_server_settings.merge({
-       :SSLEnable       => true,
-       :SSLVerifyClient => OpenSSL::SSL::VERIFY_NONE,
-       :SSLCertificate  => cert,
-       :SSLPrivateKey   => key
-    })
+    TestApp.server_settings = @@default_server_settings.merge(webrick_config)
 
     TestApp.last_request = nil
 
     @server = start_app_and_wait(TestApp)
+  end
+
+  let(:webrick_config) do
+    cert, key = WEBrick::Utils.create_self_signed_cert 2048, [["CN", ssl_cert_host]], "Logstash testing"
+    {
+      SSLEnable: true,
+      SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
+      SSLCertificate: cert,
+      SSLPrivateKey: key
+    }
   end
 
   after do
@@ -589,5 +488,45 @@ describe LogStash::Outputs::Http do # different block as we're starting web serv
     end
 
   end
+
+  context 'with supported_protocols set to (disabled) 1.1' do
+
+    let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.1'], 'ssl_verification_mode' => 'none' }
+
+    it "keeps retrying due a protocol exception" do # TLSv1.1 not enabled by default
+      expect(subject).to receive(:log_failure).
+          with('Could not fetch URL', hash_including(message: 'No appropriate protocol (protocol is disabled or cipher suites are inappropriate)')).
+          at_least(:once)
+      Thread.start { subject.multi_receive [ event ] }
+      sleep 1.0
+    end
+
+  end unless tls_version_enabled_by_default?('TLSv1.1')
+
+  context 'with supported_protocols set to 1.2/1.3' do
+
+    let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.2', 'TLSv1.3'], 'ssl_verification_mode' => 'none' }
+
+    let(:webrick_config) { super().merge SSLVersion: 'TLSv1.2' }
+
+    it "should process the request" do
+      subject.multi_receive [ event ]
+      expect(last_request_body).to include '"message":"hello!"'
+    end
+
+  end
+
+  context 'with supported_protocols set to 1.3' do
+
+    let(:config) { super().merge 'ssl_supported_protocols' => ['TLSv1.3'], 'ssl_verification_mode' => 'none' }
+
+    let(:webrick_config) { super().merge SSLVersion: 'TLSv1.3' }
+
+    it "should process the request" do
+      subject.multi_receive [ event ]
+      expect(last_request_body).to include '"message":"hello!"'
+    end
+
+  end if tls_version_enabled_by_default?('TLSv1.3') && JOpenSSL::VERSION > '0.12' # due WEBrick uses OpenSSL
 
 end
