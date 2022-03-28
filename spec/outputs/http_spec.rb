@@ -424,10 +424,8 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
 
     TestApp.last_request = nil
 
-    @server = start_app_and_wait(TestApp, &server_setup)
+    @server = start_app_and_wait(TestApp)
   end
-
-  let(:server_setup) { lambda { |_| } }
 
   let(:webrick_config) do
     cert, key = WEBrick::Utils.create_self_signed_cert 2048, [["CN", ssl_cert_host]], "Logstash testing"
