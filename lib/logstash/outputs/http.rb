@@ -189,6 +189,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         case action
         when :success
           successes += 1
+
+          pending << :done if successes + failures == event_count
         when :retry
           next_attempt = attempt + 1
           sleep_for = sleep_for_attempt(next_attempt)
@@ -197,14 +199,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           @timer.schedule(timer_task, sleep_for * 1000)
         when :failure
           failures += 1
+
+          pending << :done if successes + failures == event_count
         else
           raise "Unknown action #{action}"
-        end
-
-        if action == :success || action == :failure
-          if successes + failures == event_count
-            pending << :done
-          end
         end
       rescue => e
         # This should never happen unless there's a flat out bug in the code
