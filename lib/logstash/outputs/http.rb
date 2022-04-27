@@ -163,9 +163,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   def send_events(events)
-    successes = java.util.concurrent.atomic.AtomicInteger.new(0)
-    failures  = java.util.concurrent.atomic.AtomicInteger.new(0)
-    retries = java.util.concurrent.atomic.AtomicInteger.new(0)
     event_count = @is_batch ? 1 : events.size
 
     pending = Queue.new
@@ -174,6 +171,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     else
       events.each {|e| pending << [e, 0]}
     end
+
+    successes, failures = 0, 0
 
     while popped = pending.pop
       break if popped == :done
@@ -189,23 +188,21 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
         case action
         when :success
-          successes.incrementAndGet
+          successes += 1
         when :retry
-          retries.incrementAndGet
-
-          next_attempt = attempt+1
+          next_attempt = attempt + 1
           sleep_for = sleep_for_attempt(next_attempt)
           @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
           timer_task = RetryTimerTask.new(pending, event, next_attempt)
-          @timer.schedule(timer_task, sleep_for*1000)
+          @timer.schedule(timer_task, sleep_for * 1000)
         when :failure
-          failures.incrementAndGet
+          failures += 1
         else
           raise "Unknown action #{action}"
         end
 
         if action == :success || action == :failure
-          if successes.get+failures.get == event_count
+          if successes + failures == event_count
             pending << :done
           end
         end
@@ -215,7 +212,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           :class => e.class.name,
           :message => e.message,
           :backtrace => e.backtrace)
-        failures.incrementAndGet
+        failures += 1
         raise e
       end
     end
