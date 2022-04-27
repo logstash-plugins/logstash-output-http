@@ -251,7 +251,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       body = gzip(body)
     end
 
-    # Create an async request
     response = client.send(@http_method, url, :body => body, :headers => headers).call
 
     if !response_success?(response)
