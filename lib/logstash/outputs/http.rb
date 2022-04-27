@@ -124,6 +124,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
     # Run named Timer as daemon thread
     @timer = java.util.Timer.new("HTTP Output #{self.params['id']}", true)
+
+    @request_metrics = metric.namespace(:requests)
   end # def register
 
   def multi_receive(events)
@@ -189,9 +191,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         case action
         when :success
           successes += 1
+          @request_metrics.increment(:successes)
 
           pending << :done if successes + failures == event_count
         when :retry
+          @request_metrics.increment(:retryable_failures)
+
           next_attempt = attempt + 1
           sleep_for = sleep_for_attempt(next_attempt)
           @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
@@ -199,6 +204,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           @timer.schedule(timer_task, sleep_for * 1000)
         when :failure
           failures += 1
+          @request_metrics.increment(:failures)
 
           pending << :done if successes + failures == event_count
         else
@@ -210,7 +216,6 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           :class => e.class.name,
           :message => e.message,
           :backtrace => e.backtrace)
-        failures += 1
         raise e
       end
     end
