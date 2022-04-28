@@ -190,8 +190,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
         case action
         when :success
-          successes += 1
           @request_metrics.increment(:successes)
+          successes += 1
 
           pending << :done if successes + failures == event_count
         when :retry
@@ -203,8 +203,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
           timer_task = RetryTimerTask.new(pending, event, next_attempt)
           @timer.schedule(timer_task, sleep_for * 1000)
         when :failure
-          failures += 1
           @request_metrics.increment(:failures)
+          failures += 1
 
           pending << :done if successes + failures == event_count
         else
@@ -212,18 +212,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         end
       rescue => e
         # This should never happen unless there's a flat out bug in the code
-        @logger.error("Error sending HTTP Request",
-          :class => e.class.name,
-          :message => e.message,
-          :backtrace => e.backtrace)
+        @logger.error("Error sending HTTP Request", :message => e.message, :class => e.class, :backtrace => e.backtrace)
         raise e
       end
     end
   rescue => e
-    @logger.error("Error in http output loop",
-            :class => e.class.name,
-            :message => e.message,
-            :backtrace => e.backtrace)
+    @logger.error("Error in http output loop", :message => e.message, :class => e.class, :backtrace => e.backtrace)
     raise e
   end
 
