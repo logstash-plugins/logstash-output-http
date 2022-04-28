@@ -190,20 +190,16 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
         case action
         when :success
-          @request_metrics.increment(:successes)
           successes += 1
 
           pending << :done if successes + failures == event_count
         when :retry
-          @request_metrics.increment(:retryable_failures)
-
           next_attempt = attempt + 1
           sleep_for = sleep_for_attempt(next_attempt)
           @logger.info("Retrying http request, will sleep for #{sleep_for} seconds")
           timer_task = RetryTimerTask.new(pending, event, next_attempt)
           @timer.schedule(timer_task, sleep_for * 1000)
         when :failure
-          @request_metrics.increment(:failures)
           failures += 1
 
           pending << :done if successes + failures == event_count
@@ -250,12 +246,15 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     if !response_success?(response)
       if retryable_response?(response)
         log_retryable_response(response)
+        @request_metrics.increment(:retryable_failures)
         return :retry, event, attempt
       else
         log_error_response(response, url, event)
+        @request_metrics.increment(:failures)
         return :failure, event, attempt
       end
     else
+      @request_metrics.increment(:successes)
       return :success, event, attempt
     end
 
@@ -279,8 +278,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
     log_failure("Could not fetch URL", log_params)
 
     if will_retry
+      @request_metrics.increment(:retryable_failures)
       return :retry, event, attempt
     else
+      @request_metrics.increment(:failures)
       return :failure, event, attempt
     end
   end
