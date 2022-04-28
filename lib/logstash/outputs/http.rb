@@ -241,6 +241,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       body = gzip(body)
     end
 
+    @logger.debug? && @logger.debug("Sending request", url: url, headers: headers, body_length: body.length, attempt: attempt)
+
     response = client.send(@http_method, url, :body => body, :headers => headers).call
 
     if !response_success?(response)
