@@ -417,10 +417,10 @@ end
 
 RSpec.describe LogStash::Outputs::Http do # different block as we're starting web server with TLS
 
-  @@default_server_settings = TestApp.server_settings.dup
+  let(:default_server_settings) { TestApp.server_settings.dup }
 
   before do
-    TestApp.server_settings = @@default_server_settings.merge(webrick_config)
+    TestApp.server_settings = default_server_settings.merge(webrick_config)
 
     TestApp.last_request = nil
 
@@ -441,7 +441,7 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
     @server.shutdown # WEBrick::HTTPServer
 
     TestApp.stop! rescue nil
-    TestApp.server_settings = @@default_server_settings
+    TestApp.server_settings = default_server_settings
   end
 
   let(:ssl_cert_host) { 'localhost' }
