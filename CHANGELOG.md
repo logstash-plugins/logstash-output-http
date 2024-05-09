@@ -1,5 +1,5 @@
 ## 5.6.1
-  - Added body and event logging in debug level for non 2xx responses
+  - Added body and event logging in debug level for non 2xx responses [#142](https://github.com/logstash-plugins/logstash-output-http/pull/142)
 
 ## 5.6.0
   - Added standardized SSL settings and deprecates their non-standard counterparts. Deprecated settings will continue to work, and will provide pipeline maintainers with guidance toward using their standardized counterparts [#140](https://github.com/logstash-plugins/logstash-output-http/pull/140)
