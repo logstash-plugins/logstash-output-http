@@ -155,13 +155,10 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
 
   def log_error_response(response, url, event)
     log_details = {
-      :response_code => response.code,
+      :code => response.code,
+      :body => response.body,
       :url => url,
     }
-    if @logger.debug?
-      log_details[:event] = event.to_json
-      log_details[:response_body] = response.body
-    end
     log_failure("Encountered non-2xx HTTP code", log_details)
   end
 
