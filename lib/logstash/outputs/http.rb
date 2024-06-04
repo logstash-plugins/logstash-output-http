@@ -154,12 +154,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   end
 
   def log_error_response(response, url, event)
-    log_failure(
-              "Encountered non-2xx HTTP code #{response.code}",
-              :response_code => response.code,
-              :url => url,
-              :event => event
-            )
+    log_details = {
+      :code => response.code,
+      :body => response.body,
+      :url => url,
+    }
+    log_failure("Encountered non-2xx HTTP code", log_details)
   end
 
   def send_events(events)
