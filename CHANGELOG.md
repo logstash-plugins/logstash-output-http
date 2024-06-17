@@ -1,5 +1,5 @@
 ## 5.7.0
-  - Added new `ssl_enabled` setting for enabling/disabling the SSL configurations [#143](https://github.com/logstash-plugins/logstash-output-http/pull/143)
+  - Added new `ssl_enabled` setting for enabling/disabling the SSL configurations [#144](https://github.com/logstash-plugins/logstash-output-http/pull/144)
 
 ## 5.6.1
   - Added body logging for non 2xx responses [#142](https://github.com/logstash-plugins/logstash-output-http/pull/142)
