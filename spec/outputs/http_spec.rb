@@ -304,7 +304,7 @@ describe LogStash::Outputs::Http do
       let(:config) {
         base_config.merge({"url" => url, "http_method" => "post", "pool_max" => 1})
       }
-      let(:expected_body) { LogStash::Json.dump(event) }
+      let(:expected_body) { event.to_json }
       let(:expected_content_type) { "application/json" }
 
       include_examples("a received event")
