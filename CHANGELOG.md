@@ -1,3 +1,6 @@
+## 5.7.1
+  - Added new development `rackup` dependency to fix tests 
+
 ## 5.7.0
   - Added new `ssl_enabled` setting for enabling/disabling the SSL configurations [#144](https://github.com/logstash-plugins/logstash-output-http/pull/144)
 
