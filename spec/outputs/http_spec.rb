@@ -255,7 +255,7 @@ describe LogStash::Outputs::Http do
       end
 
       let(:last_request) { TestApp.last_request }
-      let(:body) { last_request.body.read }
+      let(:body) {  read_last_request_body(last_request) }
       let(:content_type) { last_request.env["CONTENT_TYPE"] }
 
       it "should receive the request" do
@@ -458,7 +458,7 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
   after  { subject.close }
 
   let(:last_request) { TestApp.last_request }
-  let(:last_request_body) { last_request.body.read }
+  let(:last_request_body) { read_last_request_body(last_request) }
 
   let(:event) { LogStash::Event.new("message" => "hello!") }
 
@@ -529,4 +529,11 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
 
   end if tls_version_enabled_by_default?('TLSv1.3') && JOpenSSL::VERSION > '0.12' # due WEBrick uses OpenSSL
 
+end
+
+# Pre-emptively rewind the retrieval of `last_request.body` - for form based endpoints, the body
+# is placed in params, and body is empty, requiring a `rewind` for the body to be available for comparison
+def read_last_request_body(last_request)
+  last_request.body.rewind
+  last_request.body.read
 end
