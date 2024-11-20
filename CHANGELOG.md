@@ -1,3 +1,17 @@
+## 6.0.0
+  - SSL settings that were marked deprecated in version `5.6.0` are now marked obsolete, and will prevent the plugin from starting.
+  - These settings are:   
+  - `cacert`, which should be replaced by `ssl_certificate_authorities`
+  - `client_cert`, which should be replaced by `ssl_certificate`
+  - `client_key`, which should be replaced by `ssl_key`
+  - `keystore`, which should be replaced by `ssl_keystore_path`
+  - `keystore_password`, which should be replaced by `ssl_keystore_password`
+  - `keystore_type`, which should be replaced by `ssl_keystore_password`
+  - `truststore`, which should be replaced by `ssl_truststore_path>`
+  - `truststore_password`, which should be replaced by `ssl_truststore_password`
+  - `truststore_type`, which should be replaced by `ssl_truststore_type`
+  - [#147](https://github.com/logstash-plugins/logstash-output-http/pull/147)
+
 ## 5.7.1
   - Added new development `rackup` dependency to fix tests 
 

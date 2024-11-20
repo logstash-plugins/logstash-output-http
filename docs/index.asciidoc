@@ -70,7 +70,7 @@ NOTE: The `retry_failed` option does not control the library level retry.
 
 This plugin supports the following configuration options plus the <<plugins-{type}s-{plugin}-common-options>> described later.
 
-NOTE: As of version 6.0 of this plugin, a number of previously deprecated settings related to SSL have been removed. Please see the
+NOTE: As of version `6.0.0` of this plugin, a number of previously deprecated settings related to SSL have been removed. Please see the
 <<plugins-{type}s-{plugin}-obsolete-options>> for more details.
 
 [cols="<,<,<",options="header",]
@@ -488,7 +488,7 @@ See https://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/org/apache
 [id="plugins-{type}s-{plugin}-obsolete-options"]
 ==== HTTP Output Obsolete Configuration Options
 
-WARNING: As of version `6.0` of this plugin, the following configuration options are no longer available,
+WARNING: As of version `6.0.0` of this plugin, the following configuration options are no longer available,
 and have been replaced by the following options:
 
 
