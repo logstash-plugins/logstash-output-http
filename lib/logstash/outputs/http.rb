@@ -7,7 +7,7 @@ require "logstash/plugin_mixins/http_client"
 require "zlib"
 
 class LogStash::Outputs::Http < LogStash::Outputs::Base
-  include LogStash::PluginMixins::HttpClient[:with_deprecated => true]
+  include LogStash::PluginMixins::HttpClient[:with_obsolete => true]
 
   concurrency :shared
 
