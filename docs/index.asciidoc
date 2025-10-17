@@ -195,7 +195,7 @@ Otherwise, the event is sent as json.
   * There is no default value for this setting.
 
 Custom headers to use
-format is `headers => ["X-My-Header", "%{host}"]`
+format is `headers => [{"X-My-Header" => "%{host}"}, {"X-My-Header2" => "value"}]`
 
 [id="plugins-{type}s-{plugin}-http_compression"]
 ===== `http_compression`
