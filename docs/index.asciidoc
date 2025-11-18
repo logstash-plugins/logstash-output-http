@@ -91,7 +91,7 @@ Please check out <<plugins-{type}s-{plugin}-obsolete-options>> for details.
 | <<plugins-{type}s-{plugin}-message>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-pool_max>> |<<number,number>>|No
 | <<plugins-{type}s-{plugin}-pool_max_per_route>> |<<number,number>>|No
-| <<plugins-{type}s-{plugin}-proxy>> |<<,>>|No
+| <<plugins-{type}s-{plugin}-proxy>> |<<string,string>>|No
 | <<plugins-{type}s-{plugin}-request_timeout>> |<<number,number>>|No
 | <<plugins-{type}s-{plugin}-retry_failed>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-retry_non_idempotent>> |<<boolean,boolean>>|No
