@@ -88,7 +88,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   # If message, then the body will be the result of formatting the event according to message
   #
   # Otherwise, the event is sent as json.
-  config :format, :validate => ["json", "json_batch", "form", "message"], :default => "json"
+  config :format, :validate => ["json", "json_batch", "ndjson_batch", "form", "message"], :default => "json"
 
   # Set this to true if you want to enable gzip compression for your http requests
   config :http_compression, :validate => :boolean, :default => false
@@ -112,11 +112,12 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
         when "form" ; @content_type = "application/x-www-form-urlencoded"
         when "json" ; @content_type = "application/json"
         when "json_batch" ; @content_type = "application/json"
+        when "ndjson_batch"; @content_type = "application/x-ndjson"
         when "message" ; @content_type = "text/plain"
       end
     end
 
-    @is_batch = @format == "json_batch"
+    @is_batch = %w(json_batch ndjson_batch).include?(@format)
 
     @headers["Content-Type"] = @content_type
 
@@ -336,6 +337,8 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
       event.sprintf(@message)
     elsif @format == "json_batch"
       LogStash::Json.dump(event.map {|e| map_event(e) })
+    elsif @format == "ndjson_batch"
+      event.map {|e| LogStash::Json.dump(map_event(e)) + "\n" }.join
     else
       encode(map_event(event))
     end
