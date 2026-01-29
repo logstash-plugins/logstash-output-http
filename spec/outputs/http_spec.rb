@@ -349,6 +349,19 @@ describe LogStash::Outputs::Http do
 
     end
 
+    describe "sending the batch as NDJSON" do
+      let(:config) do
+        base_config.merge({"url" => url, "http_method" => "post", "format" => "ndjson_batch"})
+      end
+
+      let(:expected_body) { events.map {|e| ::LogStash::Json.dump(e) }.join("\n") + "\n" }
+      let(:events) { [::LogStash::Event.new("a" => 1), ::LogStash::Event.new("b" => 2)]}
+      let(:expected_content_type) { "application/x-ndjson" }
+
+      include_examples("a received event")
+
+    end
+
     describe "sending the event as a form" do
       let(:config) {
         base_config.merge({"url" => url, "http_method" => "post", "pool_max" => 1, "format" => "form"})

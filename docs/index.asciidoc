@@ -146,11 +146,7 @@ Timeout (in seconds) to wait for a connection to be established. Default is `10s
 
 Content type
 
-If not specified, this defaults to the following:
-
-* if format is "json", "application/json"
-* if format is "json_batch", "application/json". Each Logstash batch of events will be concatenated into a single array and sent in one request.
-* if format is "form", "application/x-www-form-urlencoded"
+If not specified, the default value is determined by the <<plugins-{type}s-{plugin}-format>>.
 
 [id="plugins-{type}s-{plugin}-cookies"]
 ===== `cookies` 
@@ -172,21 +168,25 @@ Should redirects be followed? Defaults to `true`
 [id="plugins-{type}s-{plugin}-format"]
 ===== `format` 
 
-  * Value can be any of: `json`, `json_batch`, `form`, `message`
+  * Value can be any of: `json`, `ndjson_batch`, `json_batch`, `form`, `message`
   * Default value is `"json"`
 
 Set the format of the http body.
 
-If json_batch, each batch of events received by this output will be placed
-into a single JSON array and sent in one request. This is particularly useful
-for high throughput scenarios such as sending data between Logstash instaces.
+When set to a batch-oriented `format`, each batch of events received by this output will be transmitted in a single http request.
+This is particularly useful for high throughput scenarios such as sending data between Logstash instances.
 
-If form, then the body will be the mapping (or whole event) converted
-into a query parameter string, e.g. `foo=bar&baz=fizz...`
+Non-batch formats send one http request per event, which can have significantly lower throughput.
 
-If message, then the body will be the result of formatting the event according to message
-
-Otherwise, the event is sent as json.
+[cols="<,<,<,<",options="header",]
+|=======================================================================
+|Format |Batch?|Body|Default <<plugins-{type}s-{plugin}-content_type>>
+|`json_batch`| ✅YES | A JSON-encoded array of events | `application/json`
+|`ndjson_batch`| ✅YES | A sequence of newline-delimited json-encoded events | `application/x-ndjson`
+|`form`|️️ ⚠️NO | The mapping (or whole event) converted into a query parameter string (e.g. `foo=bar&baz=fizz...`) | `application/x-www-form-urlencoded`
+|`message`| ⚠️NO | The result of formatting the event according to <<plugins-{type}s-{plugin}-message>> | `text/plain`
+|`json`| ⚠️NO | The result of json-encoding the event | `application/json`
+|=======================================================================
 
 [id="plugins-{type}s-{plugin}-headers"]
 ===== `headers` 
@@ -252,6 +252,7 @@ For example:
 
   * Value type is <<string,string>>
   * There is no default value for this setting.
+  * This setting is ignored unless <<plugins-{type}s-{plugin}-format>> is set to `message`
 
 
 
