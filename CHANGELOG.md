@@ -1,3 +1,6 @@
+## 6.0.1
+  - [DOC] Clarify that `ssl_certificate_authorities` takes at-most-one value [#150](https://github.com/logstash-plugins/logstash-output-http/pull/150)
+
 ## 6.0.0
   - SSL settings that were marked deprecated in version `5.6.0` are now marked obsolete, and will prevent the plugin from starting.
   - These settings are:   
