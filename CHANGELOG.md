@@ -1,3 +1,6 @@
+## 5.7.2
+  - [DOC] Clarify that `ssl_certificate_authorities` takes at-most-one value [#150](https://github.com/logstash-plugins/logstash-output-http/pull/150)
+
 ## 5.7.1
   - Added new development `rackup` dependency to fix tests 
 
