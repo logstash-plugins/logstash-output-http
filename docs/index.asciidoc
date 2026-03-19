@@ -82,7 +82,7 @@ Please check out <<plugins-{type}s-{plugin}-obsolete-options>> for details.
 | <<plugins-{type}s-{plugin}-cookies>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-follow_redirects>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-format>> |<<string,string>>, one of `["json", "json_batch", "form", "message"]`|No
-| <<plugins-{type}s-{plugin}-headers>> |<<hash,hash>>|No
+| <<plugins-{type}s-{plugin}-headers>> |list of <<hash,hash>>|No
 | <<plugins-{type}s-{plugin}-http_compression>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-http_method>> |<<string,string>>, one of `["put", "post", "patch", "delete", "get", "head"]`|Yes
 | <<plugins-{type}s-{plugin}-ignorable_codes>> |<<number,number>>|No
@@ -191,7 +191,7 @@ Otherwise, the event is sent as json.
 [id="plugins-{type}s-{plugin}-headers"]
 ===== `headers` 
 
-  * Value type is <<hash,hash>>
+  * Value type is a list of <<hash,hash>>
   * There is no default value for this setting.
 
 Custom headers to use
