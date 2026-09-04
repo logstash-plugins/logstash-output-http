@@ -509,6 +509,19 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
     let(:config) { super().merge 'ssl_verification_mode' => 'none' }
 
     it "should process the request" do
+      #Mock to intercept the log failure and inspect server status
+      allow(subject).to receive(:log_failure).and_wrap_original do |original, message, opts|
+        server_status = @server.status          # :Running / :Shutdown / :Stop
+        puts <<~DIAG
+          === log_failure called ===
+          message:         #{message}
+          exception class: #{opts[:class]}
+          exception msg:   #{opts[:message]}
+          WEBrick status:  #{server_status}
+        DIAG
+        original.call(message, opts)
+      end  
+      
       subject.multi_receive [ event ]
       expect(last_request_body).to include '"message":"hello!"'
     end
