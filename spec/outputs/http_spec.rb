@@ -446,9 +446,15 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
   let(:default_server_settings) { TestApp.server_settings.dup }
 
   before do
-    TestApp.server_settings = default_server_settings.merge(webrick_config)
-
+    TestApp.server_settings = default_server_settings.merge(webrick_config).merge(
+      Logger: WEBrick::BasicLog.new($stderr, WEBrick::BasicLog::DEBUG),
+      AccessLog: [[$stderr, WEBrick::AccessLog::COMBINED_LOG_FORMAT]]
+    )
     TestApp.last_request = nil
+
+    # Reveal stray threads from previous tests
+    live = Thread.list.select { |t| t.alive? && t != Thread.current }
+    puts "=== Active threads before server start: #{live.size} ===" if live.size > 1
 
     @server = start_app_and_wait(TestApp)
   end
