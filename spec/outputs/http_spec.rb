@@ -457,6 +457,7 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
     puts "=== Active threads before server start: #{live.size} ===" if live.size > 1
 
     @server = start_app_and_wait(TestApp)
+    puts "=== Server started, status: #{@server.status} class #{@server.class}, WEBrick version: #{WEBrick::VERSION}, Sinatra running: #{TestApp.running?} ==="
   end
 
   let(:webrick_config) do
@@ -516,17 +517,19 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
 
     it "should process the request" do
       #Mock to intercept the log failure and inspect server status
-      allow(subject).to receive(:log_failure).and_wrap_original do |original, message, opts|
-        server_status = @server.status          # :Running / :Shutdown / :Stop
-        puts <<~DIAG
-          === log_failure called ===
-          message:         #{message}
-          exception class: #{opts[:class]}
-          exception msg:   #{opts[:message]}
-          WEBrick status:  #{server_status}
-        DIAG
-        original.call(message, opts)
-      end  
+      # allow(subject).to receive(:log_failure).and_wrap_original do |original, message, opts|
+      #   server_status = @server.status          # :Running / :Shutdown / :Stop
+      #   puts <<~DIAG
+      #     === log_failure called ===
+      #     message:         #{message}
+      #     exception class: #{opts[:class]}
+      #     exception msg:   #{opts[:message]}
+      #     WEBrick status:  #{server_status}
+      #   DIAG
+      #   original.call(message, opts)
+      # end  
+      
+      puts "DNADBG>> Server status from the test: #{@server.status}"
       
       subject.multi_receive [ event ]
       expect(last_request_body).to include '"message":"hello!"'
