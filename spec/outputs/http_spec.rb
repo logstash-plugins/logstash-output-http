@@ -5,12 +5,11 @@ describe LogStash::Outputs::Http do
   # Requires pool_max to be 1
 
   before(:all) do
-    @server = start_app_and_wait(TestApp)
+    @server, @server_thread = start_app_and_wait(TestApp)
   end
 
   after(:all) do
-    @server.shutdown # WEBrick::HTTPServer
-    TestApp.stop! rescue nil
+    stop_app_and_wait(TestApp, @server, @server_thread)
   end
 
   let(:port) { PORT }
@@ -450,7 +449,7 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
 
     TestApp.last_request = nil
 
-    @server = start_app_and_wait(TestApp)
+    @server, @server_thread = start_app_and_wait(TestApp)
   end
 
   let(:webrick_config) do
@@ -464,9 +463,7 @@ RSpec.describe LogStash::Outputs::Http do # different block as we're starting we
   end
 
   after do
-    @server.shutdown # WEBrick::HTTPServer
-
-    TestApp.stop! rescue nil
+    stop_app_and_wait(TestApp, @server, @server_thread)
     TestApp.server_settings = default_server_settings
   end
 
