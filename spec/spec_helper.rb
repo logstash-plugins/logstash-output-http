@@ -104,8 +104,7 @@ RSpec.configure do |config|
   #http://stackoverflow.com/questions/6557079/start-and-call-ruby-http-server-in-the-same-script
   def start_app_and_wait(app, opts = {})
     queue = Queue.new
-
-    Thread.start do
+    server_thread = Thread.start do
       begin
         app.start!({ server: 'WEBrick', port: PORT }.merge opts) do |server|
           yield(server) if block_given?
@@ -116,7 +115,18 @@ RSpec.configure do |config|
       end
     end
 
-    queue.pop # blocks until the start! callback runs
+    server = queue.pop # blocks until the start! callback runs
+    [server, server_thread]
+  end
+
+  def stop_app_and_wait(app, server, server_thread)
+    app.stop! rescue nil
+    server.shutdown rescue nil
+
+    unless server_thread.join(30)
+      warn "Timed out waiting for test server thread to stop"
+      server_thread.kill
+    end
   end
 
   config.extend(Module.new do
