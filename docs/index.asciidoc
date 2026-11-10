@@ -191,7 +191,7 @@ Otherwise, the event is sent as json.
 [id="plugins-{type}s-{plugin}-headers"]
 ===== `headers` 
 
-  * Value type is a <<hash,hash>>
+  * Value type is <<hash,hash>>
   * There is no default value for this setting.
 
 The defined headers are included in the outgoing HTTP requests. The hash should be a space-separated list of header-value pairs.
