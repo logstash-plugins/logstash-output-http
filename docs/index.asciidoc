@@ -82,7 +82,7 @@ Please check out <<plugins-{type}s-{plugin}-obsolete-options>> for details.
 | <<plugins-{type}s-{plugin}-cookies>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-follow_redirects>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-format>> |<<string,string>>, one of `["json", "json_batch", "form", "message"]`|No
-| <<plugins-{type}s-{plugin}-headers>> |list of <<hash,hash>>|No
+| <<plugins-{type}s-{plugin}-headers>> |<<hash,hash>>|No
 | <<plugins-{type}s-{plugin}-http_compression>> |<<boolean,boolean>>|No
 | <<plugins-{type}s-{plugin}-http_method>> |<<string,string>>, one of `["put", "post", "patch", "delete", "get", "head"]`|Yes
 | <<plugins-{type}s-{plugin}-ignorable_codes>> |<<number,number>>|No
@@ -191,11 +191,15 @@ Otherwise, the event is sent as json.
 [id="plugins-{type}s-{plugin}-headers"]
 ===== `headers` 
 
-  * Value type is a list of <<hash,hash>>
+  * Value type is a <<hash,hash>>
   * There is no default value for this setting.
 
-Custom headers to use
-format is `headers => {"X-My-Header" => "%{host}" "X-My-Header2" => "value"}`
+The defined headers are included in the outgoing HTTP requests. The hash should be a space-separated list of header-value pairs.
+
+For example:
+[source,ruby]
+   headers => {"X-My-Header" => "%{host}"
+               "X-My-Header2" => "value"}
 
 [id="plugins-{type}s-{plugin}-http_compression"]
 ===== `http_compression`
@@ -239,7 +243,7 @@ one with this to fix interactions with broken keepalive implementations.
   * Value type is <<hash,hash>>
   * There is no default value for this setting.
 
-This lets you choose the structure and parts of the event that are sent.
+This lets you choose the structure and parts of the event that are sent. The hash should include a space-separated list of field mappings.
 
 
 For example:
