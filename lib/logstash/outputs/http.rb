@@ -50,7 +50,7 @@ class LogStash::Outputs::Http < LogStash::Outputs::Base
   config :http_method, :validate => VALID_METHODS, :required => :true
 
   # Custom headers to use
-  # format is `headers => ["X-My-Header", "%{host}"]`
+  # format is `headers => {"X-My-Header" => "%{host}" "X-My-Header2" => "value"}``
   config :headers, :validate => :hash, :default => {}
 
   # Content type
