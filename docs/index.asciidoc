@@ -243,7 +243,7 @@ one with this to fix interactions with broken keepalive implementations.
   * Value type is <<hash,hash>>
   * There is no default value for this setting.
 
-This lets you choose the structure and parts of the event that are sent. The hash should include a space-separated list of field mappings.
+This lets you choose the structure and parts of the event that are sent. The hash should be a space-separated list of field mappings.
 
 
 For example:
